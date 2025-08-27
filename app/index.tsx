@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
 import MainMenu from '../components/MainMenu';
-import WordSprintGame from './word-sprint-game';
+import WordSprintGame from '../WordSprintGame';
 import { commonStyles } from '../styles/commonStyles';
 
 export default function MainScreen() {

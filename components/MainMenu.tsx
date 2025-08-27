@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Alert, Modal, TouchableOpacity, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Button from './Button';
+import SettingsPanel from './SettingsPanel';
 import { colors, commonStyles } from '../styles/commonStyles';
 
 interface MainMenuProps {
@@ -11,6 +12,7 @@ interface MainMenuProps {
 
 export default function MainMenu({ onStart }: MainMenuProps) {
   const [rulesVisible, setRulesVisible] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const newGame = async () => {
     Alert.alert(
@@ -78,6 +80,13 @@ export default function MainMenu({ onStart }: MainMenuProps) {
           >
             <Text style={styles.rulesButtonText}>Rules</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.settingsButton}
+            onPress={() => setShowSettings(true)}
+          >
+            <Text style={styles.settingsButtonText}>Settings</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -124,6 +133,12 @@ export default function MainMenu({ onStart }: MainMenuProps) {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* Settings Panel */}
+      <SettingsPanel 
+        visible={showSettings} 
+        onClose={() => setShowSettings(false)} 
+      />
     </View>
   );
 }
@@ -176,6 +191,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.accent,
     textDecorationLine: 'underline',
+    textAlign: 'center',
+  },
+  settingsButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  settingsButtonText: {
+    fontSize: 14,
+    color: colors.grey,
     textAlign: 'center',
   },
   // Modal styles

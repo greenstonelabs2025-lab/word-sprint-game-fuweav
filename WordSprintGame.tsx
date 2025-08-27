@@ -1,8 +1,24 @@
 
-import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, Alert, StyleSheet, Modal, TouchableOpacity } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  Alert, 
+  StyleSheet, 
+  Modal, 
+  TouchableOpacity, 
+  Pressable,
+  Animated,
+  Vibration,
+  LayoutAnimation,
+  ScrollView,
+  useWindowDimensions
+} from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { themes, wordBank } from "./wordBank";
+import SettingsPanel from "./components/SettingsPanel";
+import { colors } from "./styles/commonStyles";
 
 interface ConfirmationPopupProps {
   visible: boolean;
@@ -11,6 +27,19 @@ interface ConfirmationPopupProps {
   currentPoints: number;
   onConfirm: () => void;
   onCancel: () => void;
+}
+
+interface Settings {
+  vibrate: boolean;
+  reduceMotion: boolean;
+  highContrast: boolean;
+  sound: boolean;
+}
+
+interface GameProgress {
+  stage: number;
+  level: number;
+  points: number;
 }
 
 // Enhanced scramble function that ensures the result is always different from the original
@@ -43,6 +72,15 @@ const scramble = (word: string): string => {
   return scrambledWord;
 };
 
+// Sound effect placeholders
+const playClick = () => {
+  console.log('Click sound would play here');
+};
+
+const playSuccess = () => {
+  console.log('Success sound would play here');
+};
+
 // Confirmation Popup Component
 function ConfirmationPopup({ visible, title, cost, currentPoints, onConfirm, onCancel }: ConfirmationPopupProps) {
   const hasEnoughPoints = currentPoints >= cost;
@@ -56,12 +94,13 @@ function ConfirmationPopup({ visible, title, cost, currentPoints, onConfirm, onC
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>{title}</Text>
-          <Text style={styles.modalCost}>Cost: {cost} points</Text>
-          <Text style={styles.modalPoints}>Your points: {currentPoints}</Text>
+          <Text style={styles.modalTitle}>Spend Points?</Text>
+          <Text style={styles.modalSubtitle}>{title}</Text>
+          <Text style={styles.modalCost}>{cost} points</Text>
+          <Text style={styles.modalPoints}>You have {currentPoints} points</Text>
           
           {!hasEnoughPoints && (
-            <Text style={styles.modalWarning}>Not enough points!</Text>
+            <Text style={styles.modalWarning}>Not enough points</Text>
           )}
           
           <View style={styles.modalButtons}>
@@ -78,10 +117,7 @@ function ConfirmationPopup({ visible, title, cost, currentPoints, onConfirm, onC
                 styles.confirmButton,
                 !hasEnoughPoints && styles.disabledModalButton
               ]}
-              onPress={hasEnoughPoints ? onConfirm : () => {
-                Alert.alert("Not enough points", "You need more points to use this feature.");
-                onCancel();
-              }}
+              onPress={hasEnoughPoints ? onConfirm : onCancel}
             >
               <Text style={[
                 styles.modalButtonText,
@@ -97,37 +133,92 @@ function ConfirmationPopup({ visible, title, cost, currentPoints, onConfirm, onC
   );
 }
 
-export default function WordSprintGame() {
+interface WordSprintGameProps {
+  onExit?: () => void;
+}
+
+export default function WordSprintGame({ onExit }: WordSprintGameProps) {
+  const { height } = useWindowDimensions();
   const [stage, setStage] = useState(0);
   const [level, setLevel] = useState(0);
-  const [points, setPoints] = useState(100); // Start with some points
+  const [points, setPoints] = useState(100);
   const [streak, setStreak] = useState(0);
   const [word, setWord] = useState(wordBank[themes[0]][0]);
   const [scrambled, setScrambled] = useState(scramble(word));
   const [input, setInput] = useState("");
+  const [showBanner, setShowBanner] = useState(false);
+  const [bannerText, setBannerText] = useState("");
+  const [showStageComplete, setShowStageComplete] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settings, setSettings] = useState<Settings>({
+    vibrate: true,
+    reduceMotion: false,
+    highContrast: false,
+    sound: false,
+  });
   
   // Popup states
   const [showHintPopup, setShowHintPopup] = useState(false);
   const [showAnswerPopup, setShowAnswerPopup] = useState(false);
 
+  // Animation values
+  const scaleWord = useRef(new Animated.Value(1)).current;
+  const shake = useRef(new Animated.Value(0)).current;
+  const pressScaleSubmit = useRef(new Animated.Value(1)).current;
+  const pressScaleHint = useRef(new Animated.Value(1)).current;
+  const pressScaleAnswer = useRef(new Animated.Value(1)).current;
+  const fadeOpacity = useRef(new Animated.Value(1)).current;
+
+  // Load settings and game progress
   useEffect(() => {
-    (async () => {
-      try {
-        const d = await AsyncStorage.getItem("progress");
-        if (d) {
-          const { s, l, p } = JSON.parse(d);
-          setStage(s);
-          setLevel(l);
-          setPoints(p);
-          const w = wordBank[themes[s]][l];
-          setWord(w);
-          setScrambled(scramble(w));
-        }
-      } catch (e) {
-        console.log('Error loading progress:', e);
-      }
-    })();
+    loadSettings();
+    loadProgress();
   }, []);
+
+  const loadSettings = async () => {
+    try {
+      const keys = ['pref_vibrate', 'pref_reduce_motion', 'pref_high_contrast', 'pref_sound'];
+      const values = await AsyncStorage.multiGet(keys);
+      
+      const loadedSettings: Settings = {
+        vibrate: values[0][1] === 'true' || values[0][1] === null,
+        reduceMotion: values[1][1] === 'true',
+        highContrast: values[2][1] === 'true',
+        sound: values[3][1] === 'true',
+      };
+      
+      setSettings(loadedSettings);
+      console.log('Settings loaded in game:', loadedSettings);
+    } catch (error) {
+      console.error('Error loading settings in game:', error);
+    }
+  };
+
+  const loadProgress = async () => {
+    try {
+      const d = await AsyncStorage.getItem("progress");
+      if (d) {
+        const { stage: s, level: l, points: p } = JSON.parse(d);
+        setStage(s);
+        setLevel(l);
+        setPoints(p);
+        const w = getWordForLevel(s, l);
+        setWord(w);
+        setScrambled(scramble(w));
+        console.log(`Loaded progress: Stage ${s + 1}, Level ${l + 1}, Points ${p}`);
+      }
+    } catch (e) {
+      console.log('Error loading progress:', e);
+    }
+  };
+
+  const getWordForLevel = (stageIndex: number, levelIndex: number): string => {
+    const themeWords = wordBank[themes[stageIndex]];
+    if (!themeWords || themeWords.length === 0) {
+      return "demo"; // Fallback word
+    }
+    return themeWords[levelIndex % themeWords.length];
+  };
 
   const save = async (s: number, l: number, p: number) => {
     try {
@@ -137,21 +228,122 @@ export default function WordSprintGame() {
     }
   };
 
+  const animateCorrect = () => {
+    if (settings.reduceMotion) return;
+    
+    Animated.sequence([
+      Animated.timing(scaleWord, {
+        toValue: 1.15,
+        duration: 140,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleWord, {
+        toValue: 1,
+        friction: 4,
+        useNativeDriver: true,
+      })
+    ]).start();
+
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  };
+
+  const animateWrong = () => {
+    if (settings.vibrate) {
+      Vibration.vibrate(30);
+    }
+
+    if (!settings.reduceMotion) {
+      Animated.sequence([
+        Animated.timing(shake, {
+          toValue: 1,
+          duration: 60,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shake, {
+          toValue: -1,
+          duration: 60,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shake, {
+          toValue: 0,
+          duration: 60,
+          useNativeDriver: true,
+        })
+      ]).start();
+    }
+  };
+
+  const animateStageTransition = () => {
+    if (settings.reduceMotion) return;
+    
+    Animated.sequence([
+      Animated.timing(fadeOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      })
+    ]).start();
+  };
+
+  const showSuccessBanner = (text: string) => {
+    setBannerText(text);
+    setShowBanner(true);
+    setTimeout(() => {
+      setShowBanner(false);
+    }, 800);
+  };
+
   const next = () => {
     let l = level + 1, s = stage;
-    if (l >= 15) { s++; l = 0; }
-    if (s >= themes.length) { Alert.alert("Game Over", "All stages done!"); return; }
-    const w = wordBank[themes[s]][l];
+    
+    if (l >= 15) {
+      // Stage complete
+      setShowStageComplete(true);
+      return;
+    }
+    
+    const w = getWordForLevel(s, l);
     setStage(s);
     setLevel(l);
     setWord(w);
-    setScrambled(scramble(w)); // Re-scramble the new word
+    setScrambled(scramble(w));
     setInput("");
     save(s, l, points);
+    animateStageTransition();
     console.log(`Moved to stage ${s + 1}, level ${l + 1}: ${w}`);
   };
 
+  const nextStage = () => {
+    let s = stage + 1;
+    let l = 0;
+    
+    if (s >= themes.length) {
+      Alert.alert("Game Complete!", "Congratulations! You've completed all stages!");
+      return;
+    }
+    
+    const w = getWordForLevel(s, l);
+    setStage(s);
+    setLevel(l);
+    setWord(w);
+    setScrambled(scramble(w));
+    setInput("");
+    setShowStageComplete(false);
+    save(s, l, points);
+    animateStageTransition();
+    console.log(`Advanced to stage ${s + 1}, level ${l + 1}: ${w}`);
+  };
+
   const check = () => {
+    if (settings.sound) {
+      playClick();
+    }
+
     if (input.toLowerCase() === word.toLowerCase()) {
       let gain = 10 * (stage + 1);
       const ns = streak + 1;
@@ -159,14 +351,22 @@ export default function WordSprintGame() {
       const np = points + gain;
       setPoints(np);
       setStreak(ns);
-      Alert.alert("Correct", `+${gain} pts`);
+      
+      if (settings.sound) {
+        playSuccess();
+      }
+      
+      animateCorrect();
+      showSuccessBanner(`Correct! +${gain} pts`);
       save(stage, level, np);
-      next();
+      
+      setTimeout(() => {
+        next();
+      }, 800);
     } else {
-      Alert.alert("Wrong", "Try again");
       setStreak(0);
-      // Re-scramble on wrong answer
-      setScrambled(scramble(word));
+      animateWrong();
+      setScrambled(scramble(word)); // Re-scramble on wrong answer
       console.log('Wrong answer - re-scrambling word');
     }
   };
@@ -187,43 +387,280 @@ export default function WordSprintGame() {
     save(stage, level, np);
     Alert.alert("Answer", word);
     console.log('Answer revealed - 200 points deducted');
-    next();
+    setTimeout(() => {
+      next();
+    }, 1000);
   };
 
   const hint = () => {
+    if (settings.sound) {
+      playClick();
+    }
     setShowHintPopup(true);
   };
 
   const answer = () => {
+    if (settings.sound) {
+      playClick();
+    }
     setShowAnswerPopup(true);
   };
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Stage {stage + 1}/20 | Level {level + 1}/15</Text>
-      <Text>Theme: {themes[stage]}</Text>
-      <Text>Points: {points} | Streak: {streak}</Text>
-      <Text style={styles.word}>{scrambled}</Text>
-      <TextInput 
-        style={styles.input} 
-        value={input} 
-        onChangeText={setInput} 
-        placeholder="Unscramble..." 
+  const handleMenuPress = () => {
+    if (settings.sound) {
+      playClick();
+    }
+    save(stage, level, points);
+    onExit?.();
+  };
+
+  const handleSettingsPress = () => {
+    if (settings.sound) {
+      playClick();
+    }
+    setShowSettings(true);
+  };
+
+  const createPressHandlers = (pressScale: Animated.Value) => ({
+    onPressIn: () => {
+      if (!settings.reduceMotion) {
+        Animated.spring(pressScale, {
+          toValue: 0.96,
+          speed: 20,
+          useNativeDriver: true,
+        }).start();
+      }
+    },
+    onPressOut: () => {
+      if (!settings.reduceMotion) {
+        Animated.spring(pressScale, {
+          toValue: 1,
+          speed: 20,
+          useNativeDriver: true,
+        }).start();
+      }
+    },
+  });
+
+  // Get theme background color
+  const getThemeBackground = () => {
+    if (settings.highContrast) {
+      return '#1a1a1a';
+    }
+    
+    const themeColors: { [key: string]: string } = {
+      Animals: '#1b5e20',
+      Food: '#6d4c41',
+      Space: '#0d47a1',
+      Sports: '#004d40',
+      Mythology: '#4a148c',
+      Countries: '#263238',
+      Jobs: '#37474f',
+      Clothing: '#3e2723',
+      Music: '#1a237e',
+      Technology: '#1b1b1b',
+      Body: '#827717',
+      Weather: '#01579b',
+      Transport: '#263238',
+      History: '#4e342e',
+      Plants: '#2e7d32',
+      Colours: '#212121',
+      Oceans: '#003c8f',
+      Fantasy: '#311b92',
+      Insects: '#33691e',
+      Mixed: '#424242',
+    };
+    
+    return themeColors[themes[stage]] || '#424242';
+  };
+
+  // Get button colors based on high contrast setting
+  const getButtonColors = () => {
+    if (settings.highContrast) {
+      return {
+        submit: '#00FF00',
+        hint: '#FFD700',
+        answer: '#FF5555',
+      };
+    }
+    return {
+      submit: '#00e676',
+      hint: '#ffd54f',
+      answer: '#ff8a80',
+    };
+  };
+
+  const buttonColors = getButtonColors();
+
+  // Progress bar segments
+  const renderProgressBar = () => {
+    const segments = Array.from({ length: 15 }, (_, i) => (
+      <View
+        key={i}
+        style={[
+          styles.progressSegment,
+          { opacity: i <= level ? 1 : 0.3 }
+        ]}
       />
-      <TouchableOpacity style={styles.button} onPress={check}>
-        <Text style={styles.buttonText}>Submit</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.button} onPress={hint}>
-        <Text style={styles.buttonText}>Hint (50 pts)</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.button} onPress={answer}>
-        <Text style={styles.buttonText}>Answer (200 pts)</Text>
-      </TouchableOpacity>
+    ));
+    
+    return (
+      <View style={styles.progressContainer}>
+        <Text style={styles.progressLabel}>
+          Stage {stage + 1} • Level {level + 1}/15
+        </Text>
+        <View style={styles.progressBar}>
+          {segments}
+        </View>
+      </View>
+    );
+  };
+
+  const containerStyle = [
+    styles.container,
+    { backgroundColor: getThemeBackground() }
+  ];
+
+  const wordTransform = [
+    { scale: scaleWord },
+    { translateX: shake.interpolate({ inputRange: [-1, 1], outputRange: [-8, 8] }) }
+  ];
+
+  return (
+    <View style={containerStyle}>
+      {/* HUD Bar */}
+      <View style={styles.hudBar}>
+        {onExit && (
+          <TouchableOpacity style={styles.menuButton} onPress={handleMenuPress}>
+            <Text style={styles.menuButtonText}>Menu</Text>
+          </TouchableOpacity>
+        )}
+        
+        <Text style={styles.gameTitle}>WORD SPRINT</Text>
+        
+        <View style={styles.hudRight}>
+          <TouchableOpacity style={styles.settingsButton} onPress={handleSettingsPress}>
+            <Text style={styles.settingsButtonText}>⚙️</Text>
+          </TouchableOpacity>
+          <View style={styles.pointsPill}>
+            <Text style={styles.pointsText}>{points}</Text>
+            <Text style={styles.streakText}>🔥{streak}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Success Banner */}
+      {showBanner && (
+        <View style={[styles.banner, { backgroundColor: getThemeBackground() }]}>
+          <Text style={styles.bannerText}>{bannerText}</Text>
+        </View>
+      )}
+
+      {/* Progress Bar */}
+      {renderProgressBar()}
+
+      {/* Game Content */}
+      <View style={styles.gameContent}>
+        <Text style={styles.themeText}>Theme: {themes[stage]}</Text>
+        
+        <Animated.View style={[styles.wordCard, { opacity: fadeOpacity }]}>
+          <Animated.Text style={[styles.scrambledWord, { transform: wordTransform }]}>
+            {scrambled}
+          </Animated.Text>
+        </Animated.View>
+        
+        <TextInput
+          style={[
+            styles.input,
+            settings.highContrast && { borderColor: '#ffffff', borderWidth: 2 }
+          ]}
+          value={input}
+          onChangeText={setInput}
+          placeholder="Unscramble…"
+          placeholderTextColor="rgba(255,255,255,0.6)"
+          autoFocus={true}
+          autoCapitalize="none"
+          returnKeyType="done"
+          onSubmitEditing={check}
+        />
+        
+        <View style={styles.buttonContainer}>
+          <Pressable
+            style={[styles.gameButton, { backgroundColor: buttonColors.submit }]}
+            onPress={check}
+            {...createPressHandlers(pressScaleSubmit)}
+          >
+            <Animated.View style={{ transform: [{ scale: pressScaleSubmit }] }}>
+              <Text style={[styles.gameButtonText, settings.highContrast && { color: '#ffffff' }]}>
+                Submit
+              </Text>
+            </Animated.View>
+          </Pressable>
+          
+          <Pressable
+            style={[styles.gameButton, { backgroundColor: buttonColors.hint }]}
+            onPress={hint}
+            {...createPressHandlers(pressScaleHint)}
+          >
+            <Animated.View style={{ transform: [{ scale: pressScaleHint }] }}>
+              <Text style={[styles.gameButtonText, settings.highContrast && { color: '#ffffff' }]}>
+                Hint (50 pts)
+              </Text>
+            </Animated.View>
+          </Pressable>
+          
+          <Pressable
+            style={[styles.gameButton, { backgroundColor: buttonColors.answer }]}
+            onPress={answer}
+            {...createPressHandlers(pressScaleAnswer)}
+          >
+            <Animated.View style={{ transform: [{ scale: pressScaleAnswer }] }}>
+              <Text style={[styles.gameButtonText, settings.highContrast && { color: '#ffffff' }]}>
+                Answer (200 pts)
+              </Text>
+            </Animated.View>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Stage Complete Modal */}
+      <Modal
+        visible={showStageComplete}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.stageCompleteModal}>
+            <Text style={styles.stageCompleteTitle}>Stage {stage + 1} Clear!</Text>
+            <Text style={styles.stageCompleteText}>Total Points: {points}</Text>
+            <Text style={styles.stageCompleteText}>Streak: {streak}</Text>
+            <View style={styles.stageCompleteButtons}>
+              <TouchableOpacity
+                style={[styles.stageCompleteButton, styles.nextStageButton]}
+                onPress={nextStage}
+              >
+                <Text style={styles.stageCompleteButtonText}>Next Stage</Text>
+              </TouchableOpacity>
+              {onExit && (
+                <TouchableOpacity
+                  style={[styles.stageCompleteButton, styles.menuStageButton]}
+                  onPress={() => {
+                    setShowStageComplete(false);
+                    handleMenuPress();
+                  }}
+                >
+                  <Text style={styles.stageCompleteButtonText}>Menu</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Confirmation Popups */}
       <ConfirmationPopup
         visible={showHintPopup}
-        title="Use Hint"
+        title="Hint"
         cost={50}
         currentPoints={points}
         onConfirm={handleHintConfirm}
@@ -232,51 +669,182 @@ export default function WordSprintGame() {
 
       <ConfirmationPopup
         visible={showAnswerPopup}
-        title="Reveal Answer"
+        title="Answer"
         cost={200}
         currentPoints={points}
         onConfirm={handleAnswerConfirm}
         onCancel={() => setShowAnswerPopup(false)}
+      />
+
+      {/* Settings Panel */}
+      <SettingsPanel 
+        visible={showSettings} 
+        onClose={() => {
+          setShowSettings(false);
+          loadSettings(); // Reload settings when panel closes
+        }} 
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    alignItems: "center", 
-    justifyContent: "center", 
-    padding: 20 
+  container: {
+    flex: 1,
+    paddingTop: 50,
   },
-  header: { 
-    fontSize: 20, 
-    fontWeight: "bold", 
-    marginBottom: 10 
-  },
-  word: { 
-    fontSize: 32, 
-    margin: 20 
-  },
-  input: { 
-    borderWidth: 1, 
-    padding: 10, 
-    width: "80%", 
-    marginBottom: 10 
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginVertical: 5,
-    minWidth: 150,
+  hudBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
-  buttonText: {
-    color: 'white',
-    fontSize: 16,
+  menuButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 6,
+  },
+  menuButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
     fontWeight: '600',
+  },
+  gameTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    letterSpacing: 2,
+  },
+  hudRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  settingsButton: {
+    padding: 6,
+  },
+  settingsButtonText: {
+    fontSize: 18,
+    color: '#ffffff',
+  },
+  pointsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 8,
+  },
+  pointsText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  streakText: {
+    color: '#ffffff',
+    fontSize: 14,
+  },
+  banner: {
+    position: 'absolute',
+    top: 100,
+    left: 20,
+    right: 20,
+    padding: 12,
+    borderRadius: 8,
+    zIndex: 1000,
+  },
+  bannerText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  progressContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  progressLabel: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  progressBar: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  progressSegment: {
+    width: 16,
+    height: 4,
+    backgroundColor: '#ffffff',
+    borderRadius: 2,
+  },
+  gameContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  themeText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 16,
+    marginBottom: 20,
+  },
+  wordCard: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 30,
+    minWidth: 200,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  scrambledWord: {
+    fontSize: 42,
+    fontWeight: '700',
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  input: {
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 18,
+    textAlign: 'center',
+    width: '100%',
+    maxWidth: 300,
+    marginBottom: 30,
+    color: '#333',
+  },
+  buttonContainer: {
+    width: '100%',
+    maxWidth: 300,
+    gap: 12,
+  },
+  gameButton: {
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  gameButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
   },
   // Modal styles
   modalOverlay: {
@@ -286,43 +854,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: 'white',
+    backgroundColor: colors.backgroundAlt,
     borderRadius: 16,
     padding: 24,
     margin: 20,
     minWidth: 280,
     maxWidth: 320,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.text,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: colors.grey,
     marginBottom: 16,
     textAlign: 'center',
   },
   modalCost: {
     fontSize: 18,
-    color: '#007AFF',
+    color: colors.accent,
     fontWeight: '600',
     marginBottom: 8,
   },
   modalPoints: {
     fontSize: 16,
-    color: '#333',
+    color: colors.text,
     marginBottom: 16,
   },
   modalWarning: {
     fontSize: 14,
-    color: '#ff4444',
+    color: colors.error,
     fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
@@ -341,21 +907,67 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#666',
+    backgroundColor: colors.grey + '40',
   },
   confirmButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.accent,
   },
   disabledModalButton: {
-    backgroundColor: '#ccc',
+    backgroundColor: colors.grey + '20',
     opacity: 0.5,
   },
   modalButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: 'white',
+    color: colors.text,
   },
   disabledModalButtonText: {
-    color: '#666',
+    color: colors.grey,
+  },
+  // Stage complete modal
+  stageCompleteModal: {
+    backgroundColor: colors.backgroundAlt,
+    borderRadius: 16,
+    padding: 24,
+    margin: 20,
+    alignItems: 'center',
+    minWidth: 280,
+  },
+  stageCompleteTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  stageCompleteText: {
+    fontSize: 16,
+    color: colors.grey,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  stageCompleteButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+    width: '100%',
+  },
+  stageCompleteButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  nextStageButton: {
+    backgroundColor: colors.accent,
+  },
+  menuStageButton: {
+    backgroundColor: colors.grey + '40',
+  },
+  stageCompleteButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
   },
 });
