@@ -41,9 +41,14 @@ export default function MainScreen() {
           style={{ width: 180, height: 180 }}
           resizeMode="contain"
         />
-        <Text style={commonStyles.title}>This is a placeholder app.</Text>
-        <Text style={commonStyles.text}>Your app will be displayed here when it's ready.</Text>
+        <Text style={commonStyles.title}>Word Sprint Game</Text>
+        <Text style={commonStyles.text}>Test your vocabulary skills with this exciting word unscrambling game!</Text>
         <View style={commonStyles.buttonContainer}>
+          <Button
+            text="Play Word Sprint"
+            onPress={() => router.push('/word-sprint-game')}
+            style={buttonStyles.instructionsButton}
+          />
           {canInstall && (
             <Button
               text="Install App"
