@@ -18,6 +18,7 @@ import { colors } from '../styles/commonStyles';
 import { updatePoints } from '../utils/pointsManager';
 import { track } from '../src/analytics/AnalyticsService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import GradientButton from '../src/ui/GradientButton';
 
 interface ChallengeGameProps {
   visible: boolean;
@@ -64,12 +65,13 @@ const CompletionModal = ({ visible, challengeName, totalPoints, onClose }: Compl
         <Text style={styles.completionTitle}>🎉 Challenge Complete! 🎉</Text>
         <Text style={styles.completionChallenge}>"{challengeName}"</Text>
         <Text style={styles.completionPoints}>Total Points: {totalPoints}</Text>
-        <TouchableOpacity
-          style={styles.completionButton}
+        <GradientButton
+          title="Awesome!"
+          icon="🎉"
           onPress={onClose}
-        >
-          <Text style={styles.completionButtonText}>Awesome!</Text>
-        </TouchableOpacity>
+          colors={[colors.primary, colors.accent]}
+          style={styles.completionButtonStyle}
+        />
       </View>
     </View>
   </Modal>
@@ -395,22 +397,23 @@ export default function ChallengeGame({ visible, challengeName, words, onExit }:
           />
 
           <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.submitButton}
+            <GradientButton
+              title="Submit"
+              icon="✅"
               onPress={checkAnswer}
+              colors={['#00E676', '#00B248']}
               disabled={!guess.trim()}
-            >
-              <Text style={styles.submitButtonText}>Submit</Text>
-            </TouchableOpacity>
+              style={styles.submitButtonStyle}
+            />
 
-            <TouchableOpacity
-              style={[styles.hintButton, !isPremium && styles.disabledButton]}
+            <GradientButton
+              title={isPremium ? 'Hint' : 'Hint (Premium)'}
+              icon="💡"
               onPress={useHint}
-            >
-              <Text style={[styles.hintButtonText, !isPremium && styles.disabledButtonText]}>
-                {isPremium ? 'Hint' : 'Hint (Premium)'}
-              </Text>
-            </TouchableOpacity>
+              colors={isPremium ? ['#FFD54F', '#FFA000'] : ['#9E9E9E', '#757575']}
+              disabled={!isPremium}
+              style={styles.hintButtonStyle}
+            />
           </View>
 
           <View style={styles.infoContainer}>
@@ -539,35 +542,11 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 32,
   },
-  submitButton: {
+  submitButtonStyle: {
     flex: 2,
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
   },
-  submitButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  hintButton: {
+  hintButtonStyle: {
     flex: 1,
-    backgroundColor: colors.secondary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  hintButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  disabledButton: {
-    backgroundColor: colors.grey + '30',
-  },
-  disabledButtonText: {
-    color: colors.grey,
   },
   infoContainer: {
     alignItems: 'center',
@@ -616,18 +595,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
-  completionButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
+  completionButtonStyle: {
     minWidth: 120,
-  },
-  completionButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    textAlign: 'center',
   },
   demoTag: {
     fontSize: 12,

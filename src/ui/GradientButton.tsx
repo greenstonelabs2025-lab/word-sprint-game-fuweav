@@ -24,7 +24,9 @@ interface GradientButtonProps {
   onPress: () => void;
   colors?: [string, string];
   icon?: string;
+  iconRight?: boolean;
   disabled?: boolean;
+  size?: "sm" | "md";
   style?: any;
 }
 
@@ -33,7 +35,9 @@ const GradientButton: React.FC<GradientButtonProps> = ({
   onPress, 
   colors = ["#4A90E2", "#357ABD"], 
   icon, 
+  iconRight = false,
   disabled = false,
+  size = "md",
   style 
 }) => {
   const { width } = useWindowDimensions();
@@ -97,10 +101,18 @@ const GradientButton: React.FC<GradientButtonProps> = ({
     };
   });
 
+  // Size-based dimensions
+  const buttonHeight = size === "sm" ? 36 : 56;
+  const buttonRadius = size === "sm" ? 12 : 16;
+  const baseFontSize = size === "sm" ? 16 : 18;
+
   // Calculate responsive width
-  const buttonWidth = Math.min(width * 0.83, 400);
-  const isTablet = width > 768;
-  const maxWidth = isTablet ? 400 : width - 24;
+  const buttonWidth = size === "sm" 
+    ? Math.min(width * 0.4, 160) // Smaller width for small buttons
+    : Math.min(width * 0.85, 420); // Wide pill for regular buttons
+  const maxWidth = size === "sm" 
+    ? 160 
+    : Math.min(420, width - 24);
 
   // Get contrast color for high contrast mode
   const getContrastColor = (hexColor: string): string => {
@@ -126,10 +138,22 @@ const GradientButton: React.FC<GradientButtonProps> = ({
 
   // Auto-shrink font size for long titles
   const getFontSize = () => {
-    const baseSize = 18;
-    if (title.length > 20) return 16;
-    if (title.length > 15) return 17;
-    return baseSize;
+    if (title.length > 20) return Math.max(baseFontSize - 2, 16);
+    if (title.length > 15) return baseFontSize - 1;
+    return baseFontSize;
+  };
+
+  // Create accessibility label including icon description
+  const getAccessibilityLabel = () => {
+    let label = '';
+    if (icon && !iconRight) {
+      label += `${icon} `;
+    }
+    label += title;
+    if (icon && iconRight) {
+      label += ` ${icon}`;
+    }
+    return label;
   };
 
   return (
@@ -142,23 +166,28 @@ const GradientButton: React.FC<GradientButtonProps> = ({
         style={[{ width: Math.min(buttonWidth, maxWidth) }, style]}
         accessible={true}
         accessibilityRole="button"
-        accessibilityLabel={`${icon ? icon + ' ' : ''}${title}`}
+        accessibilityLabel={getAccessibilityLabel()}
         accessibilityHint={disabled ? 'Button is disabled' : 'Double tap to activate'}
       >
         <LinearGradient
           colors={finalColors}
           style={[
             styles.gradient,
+            { 
+              height: buttonHeight, 
+              borderRadius: buttonRadius,
+              minHeight: 44 // Accessibility minimum
+            },
             settings.highContrast && styles.highContrastGradient,
             disabled && styles.disabledGradient
           ]}
           start={[0, 0]}
           end={[1, 1]}
         >
-          <View style={styles.content}>
-            {icon && (
+          <View style={[styles.content, { gap: 8 }]}>
+            {icon && !iconRight && (
               <Text 
-                style={[styles.icon, { color: textColor }]} 
+                style={[styles.icon, { color: textColor, opacity: 0.95 }]} 
                 role="img"
                 accessibilityLabel={`${title} icon`}
               >
@@ -170,7 +199,8 @@ const GradientButton: React.FC<GradientButtonProps> = ({
                 styles.title, 
                 { 
                   color: textColor,
-                  fontSize: getFontSize()
+                  fontSize: getFontSize(),
+                  flex: icon ? 1 : 0
                 }
               ]}
               numberOfLines={2}
@@ -179,6 +209,15 @@ const GradientButton: React.FC<GradientButtonProps> = ({
             >
               {title}
             </Text>
+            {icon && iconRight && (
+              <Text 
+                style={[styles.icon, { color: textColor, opacity: 0.95 }]} 
+                role="img"
+                accessibilityLabel={`${title} icon`}
+              >
+                {icon}
+              </Text>
+            )}
           </View>
         </LinearGradient>
       </Pressable>
@@ -188,12 +227,9 @@ const GradientButton: React.FC<GradientButtonProps> = ({
 
 const styles = StyleSheet.create({
   gradient: {
-    height: 54,
-    borderRadius: 16,
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: 44, // Accessibility minimum
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -216,16 +252,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    gap: 8,
     width: '100%',
+    height: '100%',
   },
   icon: {
     fontSize: 20,
+    lineHeight: 20,
   },
   title: {
     fontWeight: 'bold',
     textAlign: 'center',
-    flex: 1,
   },
 });
 

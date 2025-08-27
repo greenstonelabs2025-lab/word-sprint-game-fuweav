@@ -14,7 +14,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import Button from './Button';
+
 import SettingsPanel from './SettingsPanel';
 import FeedbackModal from './FeedbackModal';
 import LevelDesigner from './LevelDesigner';
@@ -32,70 +32,7 @@ interface MainMenuProps {
   onChallengeGame?: (challengeName: string, words: string[]) => void;
 }
 
-interface SecondaryButtonProps {
-  text: string;
-  onPress: () => void;
-  settings: Settings;
-}
 
-function SecondaryButton({ text, onPress, settings }: SecondaryButtonProps) {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const [isPressed, setIsPressed] = useState(false);
-
-  const handlePressIn = () => {
-    setIsPressed(true);
-    if (!settings.reduceMotion) {
-      Animated.timing(scaleAnim, {
-        toValue: 0.97,
-        duration: 100,
-        useNativeDriver: true,
-      }).start();
-    }
-    
-    if (settings.vibrate) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-  };
-
-  const handlePressOut = () => {
-    setIsPressed(false);
-    if (!settings.reduceMotion) {
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }).start();
-    }
-  };
-
-  return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-      <TouchableOpacity
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        onPress={onPress}
-        activeOpacity={0.9}
-        style={[
-          styles.secondaryButton,
-          settings.highContrast && styles.highContrastSecondaryButton
-        ]}
-      >
-        {isPressed && !settings.highContrast && (
-          <LinearGradient
-            colors={['#1F2A44', '#151C2B']}
-            style={styles.secondaryButtonGradient}
-          />
-        )}
-        <Text style={[
-          styles.secondaryButtonText,
-          settings.highContrast && styles.highContrastSecondaryButtonText
-        ]}>
-          {text}
-        </Text>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
 
 export default function MainMenu({ onStart, onDailyChallenge, onStore, onChallengeGame }: MainMenuProps) {
   const [rulesVisible, setRulesVisible] = useState(false);
@@ -255,30 +192,38 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore, onChallen
             colors={['#FF8C00', '#FF512F']}
           />
           
-          {/* Secondary buttons */}
+          {/* Secondary buttons with icons */}
           <View style={styles.secondaryButtonsContainer}>
-            <SecondaryButton
-              text="Rules"
+            <GradientButton
+              title="📘 Rules"
               onPress={() => setRulesVisible(true)}
-              settings={settings}
+              colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+              size="sm"
+              style={styles.secondaryButtonPill}
             />
 
-            <SecondaryButton
-              text="Settings"
+            <GradientButton
+              title="⚙️ Settings"
               onPress={() => setShowSettings(true)}
-              settings={settings}
+              colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+              size="sm"
+              style={styles.secondaryButtonPill}
             />
 
-            <SecondaryButton
-              text="Feedback"
+            <GradientButton
+              title="✉️ Feedback"
               onPress={() => setShowFeedback(true)}
-              settings={settings}
+              colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+              size="sm"
+              style={styles.secondaryButtonPill}
             />
 
-            <SecondaryButton
-              text="Level Designer"
+            <GradientButton
+              title="✏️ Level Designer"
               onPress={() => setShowLevelDesigner(true)}
-              settings={settings}
+              colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+              size="sm"
+              style={styles.secondaryButtonPill}
             />
           </View>
         </View>
@@ -432,40 +377,11 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 20,
   },
-  secondaryButton: {
-    height: 36,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-    overflow: 'hidden',
+  secondaryButtonPill: {
+    minWidth: 120,
+    maxWidth: 160,
   },
-  secondaryButtonGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  secondaryButtonText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 14,
-    fontWeight: '500',
-    zIndex: 1,
-  },
-  // High contrast styles
-  highContrastSecondaryButton: {
-    borderWidth: 2,
-    borderColor: '#ffffff',
-    backgroundColor: '#000000',
-  },
-  highContrastSecondaryButtonText: {
-    color: '#ffffff',
-    fontWeight: 'bold',
-  },
+
   highContrastTitle: {
     color: '#ffffff',
   },

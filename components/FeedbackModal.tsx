@@ -382,6 +382,7 @@ export default function FeedbackModal({
           <View style={styles.buttonContainer}>
             <GradientButton
               title="Cancel"
+              icon="✖️"
               onPress={handleClose}
               colors={[colors.grey + '60', colors.grey + '40']}
               disabled={isSubmitting}
@@ -390,8 +391,9 @@ export default function FeedbackModal({
 
             <GradientButton
               title={isSubmitting ? 'Sending...' : 'Send'}
+              icon={isSubmitting ? undefined : '📤'}
               onPress={submitFeedback}
-              colors={isSubmitDisabled ? [colors.grey + '40', colors.grey + '20'] : [colors.accent, colors.primary]}
+              colors={isSubmitDisabled ? [colors.grey + '40', colors.grey + '20'] : ['#60A5FA', '#2563EB']}
               disabled={isSubmitDisabled}
               style={styles.button}
             />

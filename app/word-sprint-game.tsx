@@ -19,6 +19,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, commonStyles } from '../styles/commonStyles';
 import wordsData from '../data/words.json';
+import GradientButton from '../src/ui/GradientButton';
 
 interface Level {
   word: string;
@@ -197,20 +198,20 @@ function StageCompleteModal({ visible, stage, points, streak, onNextStage, onMen
             <Text style={styles.stageCompleteText}>Streak: {streak}</Text>
           </View>
           <View style={styles.stageCompleteButtons}>
-            <Pressable 
-              style={[styles.stageCompleteButton, styles.nextStageButton]} 
+            <GradientButton
+              title="Next Stage"
+              icon="➡️"
               onPress={onNextStage}
-              accessibilityLabel="Continue to next stage"
-            >
-              <Text style={styles.stageCompleteButtonText}>Next Stage</Text>
-            </Pressable>
-            <Pressable 
-              style={[styles.stageCompleteButton, styles.menuButton]} 
+              colors={['#4CAF50', '#2E7D32']}
+              style={styles.stageCompleteButtonStyle}
+            />
+            <GradientButton
+              title="Menu"
+              icon="🏠"
               onPress={onMenu}
-              accessibilityLabel="Return to main menu"
-            >
-              <Text style={styles.stageCompleteButtonText}>Menu</Text>
-            </Pressable>
+              colors={['#9E9E9E', '#757575']}
+              style={styles.stageCompleteButtonStyle}
+            />
           </View>
         </View>
       </View>
@@ -241,30 +242,22 @@ function ConfirmationPopup({ visible, title, cost, currentPoints, onConfirm, onC
           )}
           
           <View style={styles.modalButtons}>
-            <Pressable
-              style={[styles.modalButton, styles.cancelButton]}
+            <GradientButton
+              title="Cancel"
+              icon="✖️"
               onPress={onCancel}
-              accessibilityLabel="Cancel action"
-            >
-              <Text style={styles.modalButtonText}>Cancel</Text>
-            </Pressable>
+              colors={['#9E9E9E', '#757575']}
+              style={styles.modalButtonStyle}
+            />
             
-            <Pressable
-              style={[
-                styles.modalButton, 
-                styles.confirmButton,
-                !hasEnoughPoints && styles.disabledModalButton
-              ]}
+            <GradientButton
+              title="Confirm"
+              icon="✔️"
               onPress={hasEnoughPoints ? onConfirm : onCancel}
-              accessibilityLabel={hasEnoughPoints ? "Confirm purchase" : "Not enough points"}
-            >
-              <Text style={[
-                styles.modalButtonText,
-                !hasEnoughPoints && styles.disabledModalButtonText
-              ]}>
-                Confirm
-              </Text>
-            </Pressable>
+              colors={hasEnoughPoints ? ['#2196F3', '#1976D2'] : ['#9E9E9E', '#757575']}
+              disabled={!hasEnoughPoints}
+              style={styles.modalButtonStyle}
+            />
           </View>
         </View>
       </View>
@@ -661,13 +654,12 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
             Final Score: {gameState.points} points
           </Text>
           {onExit && (
-            <Pressable 
-              style={[styles.actionButton, styles.submitButton]} 
+            <GradientButton
+              title="Back to Menu"
+              icon="🏠"
               onPress={onExit}
-              accessibilityLabel="Return to main menu"
-            >
-              <Text style={styles.actionButtonText}>Back to Menu</Text>
-            </Pressable>
+              colors={['#4CAF50', '#2E7D32']}
+            />
           )}
         </View>
       </View>
@@ -688,13 +680,13 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
         {/* Left: Menu Button */}
         <View style={styles.hudLeft}>
           {onExit && (
-            <Pressable 
-              style={styles.menuButton} 
+            <GradientButton
+              title="🏠"
               onPress={handleMenuPress}
-              accessibilityLabel="Return to main menu"
-            >
-              <Text style={styles.menuButtonText}>Menu</Text>
-            </Pressable>
+              colors={['#3A4A6A', '#23314A']}
+              size="sm"
+              style={styles.menuButtonStyle}
+            />
           )}
         </View>
 
@@ -771,58 +763,31 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
             </Text>
           ) : null}
 
-          {/* Action Buttons with Press Feedback */}
+          {/* Action Buttons with GradientButton */}
           <View style={styles.buttonContainer}>
-            <Pressable 
-              style={[
-                styles.actionButton, 
-                styles.submitButton, 
-                (isAnswerRevealed || buttonsDisabled) && styles.disabledButton
-              ]} 
+            <GradientButton
+              title="Submit"
+              icon="✅"
               onPress={checkAnswer}
-              onPressIn={handlePressIn}
-              onPressOut={handlePressOut}
+              colors={['#00E676', '#00B248']}
               disabled={isAnswerRevealed || buttonsDisabled}
-              accessibilityLabel="Submit answer"
-            >
-              <Animated.View style={{ transform: [{ scale: pressScale }] }}>
-                <Text style={styles.actionButtonText}>Submit</Text>
-              </Animated.View>
-            </Pressable>
+            />
 
-            <Pressable 
-              style={[
-                styles.actionButton, 
-                styles.hintButton, 
-                (isAnswerRevealed || buttonsDisabled) && styles.disabledButton
-              ]} 
+            <GradientButton
+              title="Hint (50)"
+              icon="💡"
               onPress={useHint}
-              onPressIn={handlePressIn}
-              onPressOut={handlePressOut}
+              colors={['#FFD54F', '#FFA000']}
               disabled={isAnswerRevealed || buttonsDisabled}
-              accessibilityLabel="Buy hint"
-            >
-              <Animated.View style={{ transform: [{ scale: pressScale }] }}>
-                <Text style={styles.actionButtonText}>Hint</Text>
-              </Animated.View>
-            </Pressable>
+            />
 
-            <Pressable 
-              style={[
-                styles.actionButton, 
-                styles.answerButton, 
-                (isAnswerRevealed || buttonsDisabled) && styles.disabledButton
-              ]} 
+            <GradientButton
+              title="Answer (200)"
+              icon="🔑"
               onPress={revealAnswer}
-              onPressIn={handlePressIn}
-              onPressOut={handlePressOut}
+              colors={['#FF8A80', '#E53935']}
               disabled={isAnswerRevealed || buttonsDisabled}
-              accessibilityLabel="Reveal answer"
-            >
-              <Animated.View style={{ transform: [{ scale: pressScale }] }}>
-                <Text style={styles.actionButtonText}>Answer</Text>
-              </Animated.View>
-            </Pressable>
+            />
           </View>
         </Animated.View>
       </ScrollView>
@@ -956,16 +921,9 @@ const styles = StyleSheet.create({
     color: 'white',
     textAlign: 'center',
   },
-  menuButton: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  menuButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+  menuButtonStyle: {
+    width: 50,
+    height: 36,
   },
   pointsPill: {
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -1171,30 +1129,8 @@ const styles = StyleSheet.create({
     width: '100%',
     gap: 12,
   },
-  modalButton: {
+  modalButtonStyle: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#9E9E9E',
-  },
-  confirmButton: {
-    backgroundColor: '#2196F3',
-  },
-  disabledModalButton: {
-    backgroundColor: '#9E9E9E',
-    opacity: 0.5,
-  },
-  modalButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-  },
-  disabledModalButtonText: {
-    color: '#666',
   },
 
   // Stage Complete Modal Styles
@@ -1232,19 +1168,7 @@ const styles = StyleSheet.create({
     width: '100%',
     gap: 16,
   },
-  stageCompleteButton: {
+  stageCompleteButtonStyle: {
     flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  nextStageButton: {
-    backgroundColor: '#4CAF50',
-  },
-  stageCompleteButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: 'white',
   },
 });

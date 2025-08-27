@@ -1010,9 +1010,13 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
       {/* HUD Bar */}
       <View style={styles.hudBar}>
         {onExit && (
-          <TouchableOpacity style={styles.menuButton} onPress={handleMenuPress}>
-            <Text style={styles.menuButtonText}>Menu</Text>
-          </TouchableOpacity>
+          <GradientButton
+            title="🏠"
+            onPress={handleMenuPress}
+            colors={['#3A4A6A', '#23314A']}
+            size="sm"
+            style={styles.menuButtonPill}
+          />
         )}
         
         <Text style={styles.gameTitle}>WORD SPRINT</Text>
@@ -1062,35 +1066,29 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
         {/* Control Buttons */}
         <View style={styles.controlButtonsContainer}>
           <View style={styles.controlButtonsRow}>
-            <Pressable
-              style={[styles.controlButton, styles.backspaceButton]}
+            <GradientButton
+              title="⌫"
               onPress={handleBackspace}
-              {...createPressHandlers(pressScaleBackspace)}
-            >
-              <Animated.View style={{ transform: [{ scale: pressScaleBackspace }] }}>
-                <Text style={styles.controlButtonText}>⌫</Text>
-              </Animated.View>
-            </Pressable>
+              colors={['#FFD54F', '#FFA000']}
+              size="sm"
+              style={styles.controlButtonPill}
+            />
             
-            <Pressable
-              style={[styles.controlButton, styles.clearButton]}
+            <GradientButton
+              title="🧹 Clear"
               onPress={handleClear}
-              {...createPressHandlers(pressScaleClear)}
-            >
-              <Animated.View style={{ transform: [{ scale: pressScaleClear }] }}>
-                <Text style={styles.controlButtonText}>Clear</Text>
-              </Animated.View>
-            </Pressable>
+              colors={['#FF8A80', '#E53935']}
+              size="sm"
+              style={styles.controlButtonPill}
+            />
             
-            <Pressable
-              style={[styles.controlButton, styles.shuffleButton]}
+            <GradientButton
+              title="🔀"
               onPress={handleShuffle}
-              {...createPressHandlers(pressScaleShuffle)}
-            >
-              <Animated.View style={{ transform: [{ scale: pressScaleShuffle }] }}>
-                <Text style={styles.controlButtonText}>🔀</Text>
-              </Animated.View>
-            </Pressable>
+              colors={['#9C27B0', '#7B1FA2']}
+              size="sm"
+              style={styles.controlButtonPill}
+            />
           </View>
         </View>
         
@@ -1098,19 +1096,22 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
         <View style={styles.buttonContainer}>
           <GradientButton
             title="Submit"
+            icon="✅"
             onPress={check}
             colors={["#00E676", "#00B248"]}
           />
           
           <GradientButton
-            title={points >= 50 ? 'Hint (50 pts)' : 'Need 50 pts'}
+            title={points >= 50 ? 'Hint (50)' : 'Need 50 pts'}
+            icon="💡"
             onPress={hint}
             colors={["#FFD54F", "#FFA000"]}
             disabled={points < 50}
           />
           
           <GradientButton
-            title={points >= 200 ? 'Answer (200 pts)' : 'Need 200 pts'}
+            title={points >= 200 ? 'Answer (200)' : 'Need 200 pts'}
+            icon="🔑"
             onPress={answer}
             colors={["#FF8A80", "#E53935"]}
             disabled={points < 200}
@@ -1183,7 +1184,8 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
             <Text style={styles.gearMenuTitle}>Game Menu</Text>
             
             <GradientButton
-              title="⚙️ Settings"
+              title="Settings"
+              icon="⚙️"
               onPress={() => {
                 setShowGearMenu(false);
                 setShowSettings(true);
@@ -1193,7 +1195,8 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
             />
             
             <GradientButton
-              title="💬 Feedback"
+              title="Feedback"
+              icon="✉️"
               onPress={handleFeedbackPress}
               colors={[colors.backgroundAlt, colors.grey + '60']}
               style={styles.gearMenuItem}
@@ -1201,6 +1204,7 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
             
             <GradientButton
               title="Cancel"
+              icon="✖️"
               onPress={() => setShowGearMenu(false)}
               colors={[colors.grey + '40', colors.grey + '20']}
               style={[styles.gearMenuItem, styles.gearMenuCancel]}
@@ -1474,6 +1478,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 12,
+  },
+  controlButtonPill: {
+    minWidth: 60,
+    maxWidth: 100,
+  },
+  menuButtonPill: {
+    width: 50,
+    height: 36,
   },
   controlButton: {
     paddingHorizontal: 16,

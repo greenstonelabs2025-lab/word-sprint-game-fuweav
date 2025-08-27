@@ -43,25 +43,25 @@ interface ConfirmPurchaseModalProps {
 const purchaseItems: PurchaseItem[] = [
   {
     id: 'points_250',
-    name: 'Small Pack',
+    name: '+250',
     points: 250,
     price: '$0.99',
-    color: '#9E9E9E',
+    color: '#A7F3D0',
   },
   {
     id: 'points_600',
-    name: 'Best Value',
+    name: '+600',
     points: 600,
     price: '$1.99',
-    color: '#4CAF50',
+    color: '#93C5FD',
     isBest: true,
   },
   {
     id: 'points_1500',
-    name: 'Mega Pack',
+    name: '+1500',
     points: 1500,
     price: '$4.99',
-    color: '#9C27B0',
+    color: '#D8B4FE',
   },
 ];
 
@@ -280,15 +280,23 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
   };
 
   const renderPurchaseRow = (item: PurchaseItem) => {
-    const gradientColors = item.isBest 
-      ? ['#4CAF50', '#2E7D32'] 
-      : [item.color, item.color.replace('9', '6')]; // Slightly darker second color
+    let gradientColors: [string, string];
+    
+    if (item.id === 'points_250') {
+      gradientColors = ['#A7F3D0', '#10B981'];
+    } else if (item.id === 'points_600') {
+      gradientColors = ['#93C5FD', '#3B82F6'];
+    } else if (item.id === 'points_1500') {
+      gradientColors = ['#D8B4FE', '#8B5CF6'];
+    } else {
+      gradientColors = [item.color, item.color.replace('9', '6')];
+    }
     
     return (
       <View key={item.id} style={styles.purchaseRowContainer}>
         <GradientButton
           title={`${item.name} - ${item.price}`}
-          icon={item.isBest ? '⭐' : '💎'}
+          icon="🪙"
           onPress={() => handlePurchase(item)}
           colors={gradientColors}
           disabled={inFlight}
@@ -298,7 +306,7 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
           <Text style={styles.purchasePoints}>+{item.points} points</Text>
           {item.isBest && (
             <View style={styles.bestBadge}>
-              <Text style={styles.bestBadgeText}>Best Value</Text>
+              <Text style={styles.bestBadgeText}>Best</Text>
             </View>
           )}
         </View>
@@ -309,7 +317,9 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
   const renderToggleRow = (title: string, description: string, value: boolean, onToggle: (value: boolean) => void, disabled = false) => (
     <View style={[styles.toggleRow, disabled && styles.disabledToggleRow]}>
       <View style={styles.toggleLeft}>
-        <Text style={[styles.toggleTitle, disabled && styles.disabledText]}>{title}</Text>
+        <Text style={[styles.toggleTitle, disabled && styles.disabledText]}>
+          {title === 'Ad-Free Mode' ? '🚫 Ads' : title}
+        </Text>
         <Text style={[styles.toggleDescription, disabled && styles.disabledText]}>{description}</Text>
       </View>
       <Switch
@@ -389,9 +399,10 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
         {/* Footer */}
         <View style={styles.footer}>
           <GradientButton
-            title="Restore purchases"
+            title="Restore"
+            icon="♻️"
             onPress={restorePurchases}
-            colors={[colors.grey + '60', colors.grey + '40']}
+            colors={['#9CA3AF', '#4B5563']}
             style={styles.restoreButton}
           />
         </View>

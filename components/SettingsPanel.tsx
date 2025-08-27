@@ -208,8 +208,9 @@ export default function SettingsPanel({ visible, onClose }: SettingsPanelProps) 
               <View style={styles.dangerSection}>
                 <GradientButton
                   title="Reset Progress"
+                  icon="🗑️"
                   onPress={handleResetProgress}
-                  colors={[colors.error, '#c62828']}
+                  colors={['#FF6B6B', '#C53030']}
                   style={styles.resetButton}
                 />
               </View>
@@ -237,14 +238,16 @@ export default function SettingsPanel({ visible, onClose }: SettingsPanelProps) 
             <View style={styles.confirmButtons}>
               <GradientButton
                 title="Cancel"
+                icon="✖️"
                 onPress={() => setShowResetConfirm(false)}
                 colors={[colors.grey + '60', colors.grey + '40']}
                 style={styles.confirmButton}
               />
               <GradientButton
                 title="Confirm"
+                icon="✔️"
                 onPress={confirmResetProgress}
-                colors={[colors.error, '#c62828']}
+                colors={['#FF6B6B', '#C53030']}
                 style={styles.confirmButton}
               />
             </View>

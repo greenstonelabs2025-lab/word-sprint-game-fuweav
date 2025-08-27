@@ -20,6 +20,7 @@ import { colors } from '../styles/commonStyles';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../app/integrations/supabase/client';
 import { track } from '../src/analytics/AnalyticsService';
+import GradientButton from '../src/ui/GradientButton';
 import {
   generateDailyWord,
   getTodayKey,
@@ -598,24 +599,16 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
           editable={!isCompleted}
         />
         
-        <Pressable
-          style={[
-            styles.submitButton,
-            isCompleted && styles.disabledButton
-          ]}
-          onPress={handleSubmit}
-          disabled={isCompleted}
-          {...createPressHandlers()}
-        >
-          <Animated.View style={{ transform: [{ scale: pressScale }] }}>
-            <Text style={[
-              styles.submitButtonText,
-              settings.highContrast && { color: '#ffffff' }
-            ]}>
-              Submit
-            </Text>
-          </Animated.View>
-        </Pressable>
+        <View style={styles.submitButtonContainer}>
+          <GradientButton
+            title="Submit"
+            icon="✅"
+            onPress={handleSubmit}
+            colors={isCompleted ? ['#666666', '#444444'] : ['#00E676', '#00B248']}
+            disabled={isCompleted}
+            style={styles.submitButtonStyle}
+          />
+        </View>
 
         {/* Premium Upsell - Only show if not ad-free */}
         {!isAdFree && (
@@ -627,12 +620,14 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
               Want Hints in Daily? Unlock Premium.
             </Text>
             
-            <TouchableOpacity
-              style={styles.premiumButton}
+            <GradientButton
+              title="Go Premium"
+              icon="⭐"
               onPress={() => setShowPremiumModal(true)}
-            >
-              <Text style={styles.premiumButtonText}>Go Premium</Text>
-            </TouchableOpacity>
+              colors={['#FFC107', '#FF9800']}
+              size="sm"
+              style={styles.premiumButtonStyle}
+            />
           </View>
         )}
 
@@ -779,29 +774,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     color: '#333',
   },
-  submitButton: {
-    backgroundColor: '#00e676',
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+  submitButtonContainer: {
     width: '100%',
     maxWidth: 300,
     marginBottom: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    alignItems: 'center',
   },
-  disabledButton: {
-    backgroundColor: '#666666',
-    opacity: 0.5,
-  },
-  submitButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+  submitButtonStyle: {
+    width: '100%',
   },
   upsellContainer: {
     alignItems: 'center',
@@ -812,16 +792,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textAlign: 'center',
   },
-  premiumButton: {
-    backgroundColor: '#ffd54f',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  premiumButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+  premiumButtonStyle: {
+    width: 200,
   },
   leaderboardContainer: {
     alignItems: 'center',
