@@ -182,6 +182,50 @@ export default function DebugPanel({ visible, onClose }: DebugPanelProps) {
     );
   };
 
+  const handleForceShapesTheme = async () => {
+    Alert.alert(
+      'Force Shapes Theme',
+      'This will clear all cache and force the app to use "Shapes" as the first theme. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Force Shapes',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              
+              // Clear all theme-related cache
+              await AsyncStorage.multiRemove([
+                'progress',
+                'progress_cleared_for_wordbank',
+                'shapes_theme_forced',
+                'wordsets_cache',
+                'wordsets_last_sync',
+                'wordsets_pending_actions'
+              ]);
+              
+              // Set flag to force shapes theme
+              await AsyncStorage.setItem('force_shapes_theme', 'true');
+              
+              console.log('All cache cleared and Shapes theme forced');
+              Alert.alert(
+                'Success', 
+                'All cache cleared and Shapes theme forced. The app will now use "Shapes" as the first theme. Please restart the app.',
+                [{ text: 'OK', onPress: () => onClose() }]
+              );
+            } catch (error) {
+              console.error('Error forcing shapes theme:', error);
+              Alert.alert('Error', 'Failed to force shapes theme');
+            } finally {
+              setIsLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <Modal
       visible={visible}
@@ -197,6 +241,14 @@ export default function DebugPanel({ visible, onClose }: DebugPanelProps) {
           </Text>
 
           <View style={styles.buttonContainer}>
+            <GradientButton
+              title="🔺 Force Shapes Theme"
+              onPress={handleForceShapesTheme}
+              colors={['#4CAF50', '#388E3C']}
+              disabled={isLoading}
+              style={styles.button}
+            />
+
             <GradientButton
               title="Clear Progress Cache"
               onPress={handleClearProgressOnly}

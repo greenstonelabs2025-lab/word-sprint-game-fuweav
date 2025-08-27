@@ -26,9 +26,13 @@ import { track } from "./src/analytics/AnalyticsService";
 import { getCache, isCacheEmpty, syncWordSets } from "./src/levelsync/SyncService";
 
 // Debug log to verify themes are loaded correctly from wordBank
+console.log("=== THEME DEBUG INFO ===");
 console.log("THEMES_0=", themes[0]);
 console.log("WordBank themes count:", themes.length);
 console.log("First theme words:", wordBank[themes[0]]?.slice(0, 3));
+console.log("All themes:", themes);
+console.log("Shapes words available:", wordBank["Shapes"]?.length || 0);
+console.log("========================");
 
 interface ConfirmationPopupProps {
   visible: boolean;
@@ -321,12 +325,20 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
 
   const loadProgress = async () => {
     try {
-      // Clear progress once to ensure clean transition to wordBank
-      const clearedFlag = await AsyncStorage.getItem('progress_cleared_for_wordbank');
-      if (!clearedFlag) {
+      // Check if shapes theme should be forced
+      const forceShapes = await AsyncStorage.getItem('force_shapes_theme');
+      if (forceShapes === 'true') {
+        console.log('Force Shapes theme flag detected - ensuring clean start');
         await AsyncStorage.removeItem('progress');
-        await AsyncStorage.setItem('progress_cleared_for_wordbank', 'true');
-        console.log('Progress cleared once for wordBank transition');
+        await AsyncStorage.removeItem('force_shapes_theme');
+      }
+      
+      // Force clear progress to ensure "Shapes" theme is used
+      const shapesFlag = await AsyncStorage.getItem('shapes_theme_forced');
+      if (!shapesFlag) {
+        await AsyncStorage.removeItem('progress');
+        await AsyncStorage.setItem('shapes_theme_forced', 'true');
+        console.log('Progress cleared to force Shapes theme');
       }
       
       const d = await AsyncStorage.getItem("progress");
@@ -345,6 +357,13 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
         stored.points = 100;
       }
       
+      // Force stage 0 to ensure Shapes theme
+      if (stored.stage !== 0) {
+        console.log('Forcing stage 0 to ensure Shapes theme is used');
+        stored.stage = 0;
+        stored.level = 0;
+      }
+      
       setStage(stored.stage);
       setLevel(stored.level);
       setPoints(stored.points);
@@ -354,16 +373,17 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
       setWord(w);
       setScrambled(scramble(w));
       
-      console.log(`Progress loaded: Stage ${stored.stage + 1}, Level ${stored.level + 1}, Points ${stored.points}, Word: ${w}`);
+      console.log(`Progress loaded: Stage ${stored.stage + 1}, Level ${stored.level + 1}, Points ${stored.points}, Word: ${w}, Theme: ${themes[stored.stage]}`);
     } catch (e) {
       console.log('Error loading progress:', e);
-      // Set defaults
+      // Set defaults - always start with Shapes (stage 0)
       setStage(0);
       setLevel(0);
       setPoints(100);
       const w = getWordForLevel(0, 0);
       setWord(w);
       setScrambled(scramble(w));
+      console.log(`Default progress set: Stage 1, Level 1, Theme: ${themes[0]}, Word: ${w}`);
     }
   };
 
