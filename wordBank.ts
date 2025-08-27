@@ -1,12 +1,13 @@
 
 export const themes = [
-  "Animals","Food","Space","Sports","Mythology",
+  "Shapes","Animals","Food","Space","Sports","Mythology",
   "Countries","Jobs","Clothing","Music","Technology",
   "Body","Weather","Transport","History","Plants",
   "Colours","Oceans","Fantasy","Insects","Mixed"
 ];
 
 export const wordBank: { [key: string]: string[] } = {
+  Shapes:["circle","square","triangle","rectangle","oval","hexagon","pentagon","cube","sphere","cone","cylinder","star","diamond","heart","arrow"],
   Animals:["cat","dog","lion","bear","wolf","tiger","zebra","shark","snake","whale","camel","mouse","panda","rhino","eagle"],
   Food:["meat","milk","egg","rice","fish","bread","apple","cheese","butter","onion","pizza","sugar","grape","lemon","spice"],
   Space:["star","moon","mars","venus","earth","orbit","nova","comet","galaxy","rocket","planet","cosmos","asteroid","neptune","uranus"],
