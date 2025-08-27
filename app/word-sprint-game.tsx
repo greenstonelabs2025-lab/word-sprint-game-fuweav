@@ -10,9 +10,9 @@ import {
   Platform,
   Modal,
   TouchableOpacity,
+  Pressable,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Button from '../components/Button';
 import { colors, commonStyles } from '../styles/commonStyles';
 import wordsData from '../data/words.json';
 
@@ -52,6 +52,30 @@ const STORAGE_KEYS = {
   GAME_STATE: 'word_sprint_game_state',
   POINTS: 'word_sprint_points',
   PROGRESS: 'progress', // For compatibility with MainMenu
+};
+
+// Theme background colors mapping
+const themeColors: { [key: string]: string } = {
+  Animals: '#1b5e20',
+  Food: '#6d4c41',
+  Space: '#0d47a1',
+  Sports: '#004d40',
+  Mythology: '#4a148c',
+  Countries: '#263238',
+  Jobs: '#37474f',
+  Clothing: '#3e2723',
+  Music: '#1a237e',
+  Technology: '#1b1b1b',
+  Body: '#827717',
+  Weather: '#01579b',
+  Transport: '#263238',
+  History: '#4e342e',
+  Plants: '#2e7d32',
+  Colours: '#212121',
+  Oceans: '#003c8f',
+  Fantasy: '#311b92',
+  Insects: '#33691e',
+  Mixed: '#424242',
 };
 
 // Enhanced scramble function that ensures the result is always different from the original
@@ -160,6 +184,7 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
   const stages: Stage[] = wordsData as Stage[];
   const currentStageData = stages[gameState.currentStage];
   const currentLevelData = currentStageData?.levels[gameState.currentLevel];
+  const currentThemeColor = currentStageData ? themeColors[currentStageData.theme] || '#424242' : '#424242';
 
   useEffect(() => {
     loadGameState();
@@ -371,11 +396,6 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
     setShowAnswerPopup(true);
   };
 
-  const purchaseHints = () => {
-    // Placeholder for future monetization
-    Alert.alert('Coming Soon', 'Hint purchasing will be available in a future update!');
-  };
-
   const renderScrambledWord = () => {
     if (!currentLevelData || !currentScrambledWord) return null;
 
@@ -401,120 +421,120 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
     );
   };
 
-  const getStreakBonus = () => {
-    return Math.floor(gameState.streak / 3) * 5;
-  };
-
   if (!currentStageData || !currentLevelData) {
     return (
-      <View style={commonStyles.container}>
-        <Text style={commonStyles.title}>Game Complete!</Text>
-        <Text style={styles.completionText}>
-          Congratulations! You&apos;ve completed all {stages.length} stages!
-        </Text>
-        <Text style={styles.finalScore}>
-          Final Score: {gameState.points} points
-        </Text>
-        {onExit && (
-          <Button text="Back to Menu" onPress={onExit} />
-        )}
+      <View style={[styles.container, { backgroundColor: currentThemeColor }]}>
+        <View style={styles.gameCard}>
+          <Text style={styles.gameTitle}>Game Complete!</Text>
+          <Text style={styles.completionText}>
+            Congratulations! You&apos;ve completed all {stages.length} stages!
+          </Text>
+          <Text style={styles.finalScore}>
+            Final Score: {gameState.points} points
+          </Text>
+          {onExit && (
+            <Pressable style={[styles.actionButton, styles.submitButton]} onPress={onExit}>
+              <Text style={styles.actionButtonText}>Back to Menu</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
     );
   }
 
   return (
-    <ScrollView style={commonStyles.wrapper} contentContainerStyle={styles.container}>
-      {/* Menu Button */}
-      {onExit && (
-        <View style={styles.menuButtonContainer}>
-          <TouchableOpacity style={styles.menuButton} onPress={handleMenuPress}>
-            <Text style={styles.menuButtonText}>Menu</Text>
-          </TouchableOpacity>
+    <View style={[styles.container, { backgroundColor: currentThemeColor }]}>
+      {/* Top HUD Bar */}
+      <View style={styles.hudBar}>
+        {/* Left: Menu Button */}
+        <View style={styles.hudLeft}>
+          {onExit && (
+            <Pressable style={styles.menuButton} onPress={handleMenuPress}>
+              <Text style={styles.menuButtonText}>Menu</Text>
+            </Pressable>
+          )}
         </View>
-      )}
 
-      {/* Header Info */}
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <Text style={styles.stageText}>
-            Stage {gameState.currentStage + 1} - {currentStageData.theme}
-          </Text>
-          <Text style={styles.pointsText}>
-            {gameState.points} pts
-          </Text>
+        {/* Center: Title */}
+        <View style={styles.hudCenter}>
+          <Text style={styles.hudTitle}>WORD SPRINT</Text>
         </View>
-        <View style={styles.headerRow}>
-          <Text style={styles.levelText}>
-            Level {gameState.currentLevel + 1}/15
-          </Text>
-          <Text style={styles.streakText}>
-            Streak: {gameState.streak} {getStreakBonus() > 0 && `(+${getStreakBonus()} bonus)`}
-          </Text>
+
+        {/* Right: Points and Streak Pill */}
+        <View style={styles.hudRight}>
+          <View style={styles.pointsPill}>
+            <Text style={styles.pointsText}>{gameState.points}</Text>
+            <Text style={styles.streakText}>Streak: {gameState.streak}</Text>
+          </View>
         </View>
       </View>
 
-      {/* Scrambled Word Display */}
-      <View style={styles.gameArea}>
-        <Text style={styles.instructionText}>Unscramble this word:</Text>
-        {renderScrambledWord()}
-        
-        {/* User Input */}
-        <TextInput
-          style={styles.input}
-          value={userInput}
-          onChangeText={setUserInput}
-          placeholder="Type your answer here..."
-          placeholderTextColor={colors.grey}
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!isAnswerRevealed}
-        />
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* Game Card with Overlay */}
+        <View style={styles.gameCard}>
+          {/* Stage and Level Info */}
+          <Text style={styles.stageLabel}>Stage {gameState.currentStage + 1} • {currentStageData.theme}</Text>
+          <Text style={styles.levelLabel}>Level {gameState.currentLevel + 1} of 15</Text>
 
-        {/* Message Display */}
-        {message ? (
-          <Text style={[
-            styles.message, 
-            message.includes('Correct') && styles.successMessage,
-            message.includes('Try again') && styles.errorMessage
-          ]}>
-            {message}
+          {/* Scrambled Word Display */}
+          <Text style={styles.scrambledWordTitle}>
+            {currentScrambledWord.toUpperCase()}
           </Text>
-        ) : null}
-      </View>
 
-      {/* Action Buttons */}
-      <View style={styles.buttonContainer}>
-        <Button
-          text="Submit Answer"
-          onPress={checkAnswer}
-          style={[styles.submitButton, isAnswerRevealed && styles.disabledButton]}
-        />
-        
-        <View style={styles.hintButtonRow}>
-          <Button
-            text={`Hint (50 pts)`}
-            onPress={useHint}
-            style={[
-              styles.hintButton, 
-              isAnswerRevealed && styles.disabledButton
-            ]}
+          {/* User Input */}
+          <TextInput
+            style={styles.input}
+            value={userInput}
+            onChangeText={setUserInput}
+            placeholder="Unscramble…"
+            placeholderTextColor="rgba(0,0,0,0.5)"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoFocus={true}
+            returnKeyType="done"
+            onSubmitEditing={checkAnswer}
+            editable={!isAnswerRevealed}
           />
-          <Button
-            text={`Answer (200 pts)`}
-            onPress={revealAnswer}
-            style={[
-              styles.answerButton, 
-              isAnswerRevealed && styles.disabledButton
-            ]}
-          />
-        </View>
 
-        <Button
-          text="Purchase More Hints"
-          onPress={purchaseHints}
-          style={styles.purchaseButton}
-        />
-      </View>
+          {/* Message Display */}
+          {message ? (
+            <Text style={[
+              styles.message, 
+              message.includes('Correct') && styles.successMessage,
+              message.includes('Try again') && styles.errorMessage
+            ]}>
+              {message}
+            </Text>
+          ) : null}
+
+          {/* Action Buttons */}
+          <View style={styles.buttonContainer}>
+            <Pressable 
+              style={[styles.actionButton, styles.submitButton, isAnswerRevealed && styles.disabledButton]} 
+              onPress={checkAnswer}
+              disabled={isAnswerRevealed}
+            >
+              <Text style={styles.actionButtonText}>Submit</Text>
+            </Pressable>
+
+            <Pressable 
+              style={[styles.actionButton, styles.hintButton, isAnswerRevealed && styles.disabledButton]} 
+              onPress={useHint}
+              disabled={isAnswerRevealed}
+            >
+              <Text style={styles.actionButtonText}>Hint</Text>
+            </Pressable>
+
+            <Pressable 
+              style={[styles.actionButton, styles.answerButton, isAnswerRevealed && styles.disabledButton]} 
+              onPress={revealAnswer}
+              disabled={isAnswerRevealed}
+            >
+              <Text style={styles.actionButtonText}>Answer</Text>
+            </Pressable>
+          </View>
+        </View>
+      </ScrollView>
 
       {/* Confirmation Popups */}
       <ConfirmationPopup
@@ -534,75 +554,191 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
         onConfirm={handleAnswerConfirm}
         onCancel={() => setShowAnswerPopup(false)}
       />
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
-    padding: 20,
+    flex: 1,
   },
-  menuButtonContainer: {
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: 16,
+    paddingTop: 8,
+  },
+  
+  // HUD Bar Styles
+  hudBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingTop: Platform.OS === 'ios' ? 50 : 12,
+  },
+  hudLeft: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  hudCenter: {
+    flex: 2,
+    alignItems: 'center',
+  },
+  hudRight: {
+    flex: 1,
     alignItems: 'flex-end',
-    marginBottom: 10,
+  },
+  hudTitle: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    letterSpacing: 2,
+    color: 'white',
+    textAlign: 'center',
   },
   menuButton: {
-    backgroundColor: colors.backgroundAlt,
-    borderWidth: 1,
-    borderColor: colors.grey,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 8,
   },
   menuButtonText: {
-    color: colors.text,
+    color: 'white',
     fontSize: 14,
     fontWeight: '600',
   },
-  header: {
-    backgroundColor: colors.backgroundAlt,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  pointsPill: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  stageText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text,
   },
   pointsText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.accent,
-  },
-  levelText: {
+    color: 'white',
     fontSize: 16,
-    color: colors.text,
+    fontWeight: 'bold',
   },
   streakText: {
-    fontSize: 14,
-    color: colors.grey,
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    fontWeight: '500',
   },
-  gameArea: {
-    flex: 1,
-    alignItems: 'center',
-    marginBottom: 20,
+
+  // Game Card Styles
+  gameCard: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 8,
+    boxShadow: '0px 4px 8px rgba(0,0,0,0.1)',
+    elevation: 3,
   },
-  instructionText: {
+  stageLabel: {
     fontSize: 16,
-    color: colors.text,
-    marginBottom: 20,
+    color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
+    marginBottom: 4,
   },
+  levelLabel: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  scrambledWordTitle: {
+    fontSize: 44,
+    fontWeight: '700',
+    color: 'white',
+    textAlign: 'center',
+    marginBottom: 32,
+    letterSpacing: 4,
+  },
+
+  // Input Styles
+  input: {
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 18,
+    color: '#000',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+
+  // Message Styles
+  message: {
+    fontSize: 16,
+    color: 'white',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  successMessage: {
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+  errorMessage: {
+    color: '#FF5722',
+    fontWeight: 'bold',
+  },
+
+  // Button Styles
+  buttonContainer: {
+    gap: 8,
+  },
+  actionButton: {
+    height: 44,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    boxShadow: '0px 2px 4px rgba(0,0,0,0.2)',
+    elevation: 2,
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  submitButton: {
+    backgroundColor: '#00e676',
+  },
+  hintButton: {
+    backgroundColor: '#ffd54f',
+  },
+  answerButton: {
+    backgroundColor: '#ff8a80',
+  },
+  disabledButton: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    opacity: 0.5,
+  },
+
+  // Completion Styles
+  gameTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: 'white',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  completionText: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  finalScore: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+    textAlign: 'center',
+    marginBottom: 30,
+  },
+
+  // Legacy styles for scrambled word display (keeping for compatibility)
   scrambledContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -610,9 +746,9 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   letterBox: {
-    backgroundColor: colors.backgroundAlt,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     borderWidth: 2,
-    borderColor: colors.grey,
+    borderColor: 'rgba(255,255,255,0.3)',
     borderRadius: 8,
     width: 40,
     height: 40,
@@ -621,89 +757,18 @@ const styles = StyleSheet.create({
     margin: 4,
   },
   revealedLetterBox: {
-    backgroundColor: colors.primary,
-    borderColor: colors.accent,
+    backgroundColor: 'rgba(255,255,255,0.4)',
+    borderColor: 'rgba(255,255,255,0.6)',
   },
   letterText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.text,
+    color: 'white',
   },
   revealedLetterText: {
-    color: colors.white,
+    color: 'white',
   },
-  input: {
-    backgroundColor: colors.backgroundAlt,
-    borderWidth: 2,
-    borderColor: colors.grey,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: colors.text,
-    width: '100%',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  message: {
-    fontSize: 16,
-    color: colors.text,
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  successMessage: {
-    color: colors.accent,
-    fontWeight: 'bold',
-  },
-  errorMessage: {
-    color: colors.error || '#ff4444',
-    fontWeight: 'bold',
-  },
-  buttonContainer: {
-    width: '100%',
-  },
-  submitButton: {
-    backgroundColor: colors.primary,
-    marginBottom: 10,
-  },
-  hintButtonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  hintButton: {
-    backgroundColor: colors.secondary,
-    flex: 0.48,
-  },
-  answerButton: {
-    backgroundColor: colors.accent,
-    flex: 0.48,
-  },
-  disabledButton: {
-    backgroundColor: colors.grey,
-    opacity: 0.5,
-  },
-  purchaseButton: {
-    backgroundColor: colors.card,
-    marginBottom: 10,
-  },
-  backButton: {
-    backgroundColor: colors.backgroundAlt,
-    borderWidth: 1,
-    borderColor: colors.grey,
-  },
-  completionText: {
-    fontSize: 16,
-    color: colors.text,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  finalScore: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.accent,
-    textAlign: 'center',
-    marginBottom: 30,
-  },
+
   // Modal styles
   modalOverlay: {
     flex: 1,
@@ -712,7 +777,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: colors.background,
+    backgroundColor: 'white',
     borderRadius: 16,
     padding: 24,
     margin: 20,
@@ -725,24 +790,24 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: colors.text,
+    color: '#000',
     marginBottom: 16,
     textAlign: 'center',
   },
   modalCost: {
     fontSize: 18,
-    color: colors.accent,
+    color: '#2196F3',
     fontWeight: '600',
     marginBottom: 8,
   },
   modalPoints: {
     fontSize: 16,
-    color: colors.text,
+    color: '#000',
     marginBottom: 16,
   },
   modalWarning: {
     fontSize: 14,
-    color: colors.error || '#ff4444',
+    color: '#f44336',
     fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
@@ -761,21 +826,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: colors.grey,
+    backgroundColor: '#9E9E9E',
   },
   confirmButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#2196F3',
   },
   disabledModalButton: {
-    backgroundColor: colors.grey,
+    backgroundColor: '#9E9E9E',
     opacity: 0.5,
   },
   modalButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.white,
+    color: 'white',
   },
   disabledModalButtonText: {
-    color: colors.text,
+    color: '#666',
   },
 });
