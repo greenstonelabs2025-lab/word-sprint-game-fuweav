@@ -25,6 +25,9 @@ import { colors } from "./styles/commonStyles";
 import { track } from "./src/analytics/AnalyticsService";
 import { getCache, isCacheEmpty, syncWordSets } from "./src/levelsync/SyncService";
 
+// THEME0_CHECK: Verify themes are loaded correctly from wordBank
+console.log("THEME0_CHECK:", themes[0]);
+
 // Debug log to verify themes are loaded correctly from wordBank
 console.log("=== THEME DEBUG INFO ===");
 console.log("THEMES_0=", themes[0]);
@@ -325,20 +328,12 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
 
   const loadProgress = async () => {
     try {
-      // Check if shapes theme should be forced
-      const forceShapes = await AsyncStorage.getItem('force_shapes_theme');
-      if (forceShapes === 'true') {
-        console.log('Force Shapes theme flag detected - ensuring clean start');
+      // One-time cache clear to ensure Shapes theme is used
+      const cacheCleared = await AsyncStorage.getItem('shapes_cache_cleared');
+      if (!cacheCleared) {
+        console.log('One-time cache clear: removing progress to ensure Shapes theme');
         await AsyncStorage.removeItem('progress');
-        await AsyncStorage.removeItem('force_shapes_theme');
-      }
-      
-      // Force clear progress to ensure "Shapes" theme is used
-      const shapesFlag = await AsyncStorage.getItem('shapes_theme_forced');
-      if (!shapesFlag) {
-        await AsyncStorage.removeItem('progress');
-        await AsyncStorage.setItem('shapes_theme_forced', 'true');
-        console.log('Progress cleared to force Shapes theme');
+        await AsyncStorage.setItem('shapes_cache_cleared', 'true');
       }
       
       const d = await AsyncStorage.getItem("progress");
@@ -349,31 +344,36 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
         console.log('Loaded stored progress:', stored);
       }
       
-      // Add safety check to prevent crashes if indexes shifted
-      if (stored.stage >= themes.length) {
-        console.log('Stage index out of bounds, resetting to stage 0');
-        stored.stage = 0;
-        stored.level = 0;
-        stored.points = 100;
+      let s = stored.stage;
+      let l = stored.level;
+      let p = stored.points;
+      
+      // Guard old saves - prevent crashes if stage index is out of bounds
+      if (s >= themes.length) {
+        console.log('Stage index out of bounds, resetting to 0');
+        s = 0;
+        l = 0;
+        p = 100;
       }
       
-      // Force stage 0 to ensure Shapes theme
-      if (stored.stage !== 0) {
-        console.log('Forcing stage 0 to ensure Shapes theme is used');
-        stored.stage = 0;
-        stored.level = 0;
+      // If saved theme name was "Test" or "Test Animals", hard reset
+      if (themes[0] !== "Shapes") {
+        console.log('First theme is not Shapes, hard reset');
+        s = 0;
+        l = 0;
+        p = 100;
       }
       
-      setStage(stored.stage);
-      setLevel(stored.level);
-      setPoints(stored.points);
+      setStage(s);
+      setLevel(l);
+      setPoints(p);
       
       // Set word from themes after setting stage/level
-      const w = getWordForLevel(stored.stage, stored.level);
+      const w = getWordForLevel(s, l);
       setWord(w);
       setScrambled(scramble(w));
       
-      console.log(`Progress loaded: Stage ${stored.stage + 1}, Level ${stored.level + 1}, Points ${stored.points}, Word: ${w}, Theme: ${themes[stored.stage]}`);
+      console.log(`Progress loaded: Stage ${s + 1}, Level ${l + 1}, Points ${p}, Word: ${w}, Theme: ${themes[s]}`);
     } catch (e) {
       console.log('Error loading progress:', e);
       // Set defaults - always start with Shapes (stage 0)
@@ -388,18 +388,15 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
   };
 
   const getWordForLevel = (stageIndex: number, levelIndex: number): string => {
-    const currentThemes = wordSetsCache.themes.length > 0 ? wordSetsCache.themes : themes;
-    const currentBank = Object.keys(wordSetsCache.bank).length > 0 ? wordSetsCache.bank : wordBank;
+    const theme = themes[stageIndex];
+    const word = wordBank[theme][levelIndex];
     
-    const themeName = currentThemes[stageIndex];
-    const themeWords = currentBank[themeName];
-    
-    if (!themeWords || themeWords.length === 0) {
-      console.warn(`No words found for theme ${themeName}, using fallback`);
+    if (!word) {
+      console.warn(`No word found for theme ${theme} at level ${levelIndex}, using fallback`);
       return "demo"; // Fallback word
     }
     
-    return themeWords[levelIndex % themeWords.length];
+    return word;
   };
 
   const save = async (s: number, l: number, p: number) => {
@@ -588,9 +585,7 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     let s = stage + 1;
     let l = 0;
     
-    const currentThemes = wordSetsCache.themes.length > 0 ? wordSetsCache.themes : themes;
-    
-    if (s >= currentThemes.length) {
+    if (s >= themes.length) {
       Alert.alert("Game Complete!", "Congratulations! You've completed all stages!");
       return;
     }
@@ -623,13 +618,12 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
       setStreak(ns);
       
       // Track correct answer
-      const currentThemes = wordSetsCache.themes.length > 0 ? wordSetsCache.themes : themes;
       track("correct", {
         stage: stage + 1,
         level: level + 1,
         gain,
         streak: ns,
-        theme: currentThemes[stage],
+        theme: themes[stage],
         word: targetWord
       });
       
@@ -648,11 +642,10 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
       setStreak(0);
       
       // Track wrong answer
-      const currentThemes = wordSetsCache.themes.length > 0 ? wordSetsCache.themes : themes;
       track("wrong", {
         stage: stage + 1,
         level: level + 1,
-        theme: currentThemes[stage],
+        theme: themes[stage],
         word: targetWord,
         guess: guess
       });
@@ -680,10 +673,9 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
             text: "Report Bug", 
             style: "default",
             onPress: () => {
-              const currentThemes = wordSetsCache.themes.length > 0 ? wordSetsCache.themes : themes;
               setFeedbackContext({
                 category: 'Bug',
-                message: `Context: Wrong answer on "${word}" (Stage ${stage + 1}, Level ${level + 1}, Theme: ${currentThemes[stage]}). My guess was "${guess}". `
+                message: `Context: Wrong answer on "${word}" (Stage ${stage + 1}, Level ${level + 1}, Theme: ${themes[stage]}). My guess was "${guess}". `
               });
               setShowFeedback(true);
             }
@@ -700,13 +692,12 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
       setPoints(newPoints);
       
       // Track hint purchase
-      const currentThemes = wordSetsCache.themes.length > 0 ? wordSetsCache.themes : themes;
       track("hint_buy", {
         cost: 50,
         points: newPoints,
         stage: stage + 1,
         level: level + 1,
-        theme: currentThemes[stage],
+        theme: themes[stage],
         word: word.toLowerCase()
       });
       
@@ -744,13 +735,12 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
       setPoints(newPoints);
       
       // Track answer purchase
-      const currentThemes = wordSetsCache.themes.length > 0 ? wordSetsCache.themes : themes;
       track("answer_buy", {
         cost: 200,
         points: newPoints,
         stage: stage + 1,
         level: level + 1,
-        theme: currentThemes[stage],
+        theme: themes[stage],
         word: word.toLowerCase()
       });
       
@@ -902,8 +892,7 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
       Mixed: '#424242',
     };
     
-    const currentThemes = wordSetsCache.themes.length > 0 ? wordSetsCache.themes : themes;
-    return themeColors[currentThemes[stage]] || '#424242';
+    return themeColors[themes[stage]] || '#424242';
   };
 
   // Get button colors based on high contrast setting
@@ -1078,8 +1067,6 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     );
   }
 
-  const currentThemes = wordSetsCache.themes.length > 0 ? wordSetsCache.themes : themes;
-
   return (
     <View style={containerStyle}>
       {/* Fixed HUD Bar */}
@@ -1130,7 +1117,7 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
 
       {/* Game Content */}
       <ScrollView style={styles.gameContent} contentContainerStyle={styles.gameContentContainer}>
-        <Text style={styles.themeText}>Theme: {currentThemes[stage]}</Text>
+        <Text style={styles.themeText}>Theme: {themes[stage]}</Text>
         
         <Animated.View style={[styles.wordCard, { opacity: fadeOpacity }]}>
           <Animated.Text style={[styles.scrambledWord, { transform: wordTransform }]}>
@@ -1315,7 +1302,7 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
         currentStage={stage}
         currentLevel={level}
         currentPoints={points}
-        currentTheme={currentThemes[stage]}
+        currentTheme={themes[stage]}
       />
 
       {/* Debug Panel */}
