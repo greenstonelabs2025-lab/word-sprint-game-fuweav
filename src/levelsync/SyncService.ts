@@ -7,6 +7,8 @@ import { Alert } from 'react-native';
 const WS_CACHE_KEY = 'ws_cache';
 const WS_LAST_SYNC_KEY = 'ws_last_sync';
 const WS_PENDING_KEY = 'ws_pending';
+const WS_CHALLENGES_KEY = 'ws_challenges';
+const WS_CHALLENGES_SYNC_KEY = 'ws_challenges_last_sync';
 
 interface WordSetCache {
   themes: string[];
@@ -29,6 +31,22 @@ interface WordSet {
   updated_at: string;
 }
 
+interface Challenge {
+  id: string;
+  name: string;
+  words: string[];
+  active_from: string;
+  active_to: string;
+  version: number;
+  updated_at: string;
+}
+
+interface ChallengeCache {
+  name: string;
+  words: string[];
+  version: number;
+}
+
 // Initialize empty cache if none exists
 export async function initializeCache(): Promise<void> {
   try {
@@ -41,6 +59,13 @@ export async function initializeCache(): Promise<void> {
       };
       await AsyncStorage.setItem(WS_CACHE_KEY, JSON.stringify(emptyCache));
       console.log('Initialized empty word sets cache');
+    }
+    
+    // Initialize challenges cache if it doesn't exist
+    const challengesExisting = await AsyncStorage.getItem(WS_CHALLENGES_KEY);
+    if (!challengesExisting) {
+      await AsyncStorage.setItem(WS_CHALLENGES_KEY, JSON.stringify([]));
+      console.log('Initialized empty challenges cache');
     }
   } catch (error) {
     console.error('Failed to initialize cache:', error);
@@ -340,4 +365,109 @@ export async function getLastSyncTime(): Promise<string | null> {
 export async function isCacheEmpty(): Promise<boolean> {
   const cache = await getCache();
   return cache.themes.length === 0;
+}
+
+// Get challenges cache
+export async function getChallengesCache(): Promise<ChallengeCache[]> {
+  try {
+    const cached = await AsyncStorage.getItem(WS_CHALLENGES_KEY);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (error) {
+    console.error('Failed to load challenges cache:', error);
+  }
+  
+  return [];
+}
+
+// Save challenges cache
+async function saveChallengesCache(challenges: ChallengeCache[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(WS_CHALLENGES_KEY, JSON.stringify(challenges));
+    console.log('Challenges cache saved successfully');
+  } catch (error) {
+    console.error('Failed to save challenges cache:', error);
+  }
+}
+
+// Sync challenges from Supabase
+export async function syncChallenges(): Promise<void> {
+  console.log('Starting challenges sync...');
+  
+  try {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    console.log('Fetching challenges active on:', today);
+    
+    // Fetch active challenges from Supabase
+    // Get challenges where today is between active_from and active_to
+    const { data: challenges, error } = await supabase
+      .from('seasonal_challenges')
+      .select('*')
+      .filter('active_from', 'lte', today)
+      .filter('active_to', 'gte', today)
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.error('Failed to fetch challenges:', error);
+      return; // Keep cache unchanged on error
+    }
+
+    if (!challenges) {
+      console.log('No active challenges found');
+      await saveChallengesCache([]);
+      return;
+    }
+
+    // Convert to cache format
+    const challengeCache: ChallengeCache[] = challenges.map(challenge => ({
+      name: challenge.name,
+      words: challenge.words,
+      version: challenge.version
+    }));
+
+    await saveChallengesCache(challengeCache);
+    
+    // Update last sync timestamp
+    await AsyncStorage.setItem(WS_CHALLENGES_SYNC_KEY, new Date().toISOString());
+    console.log(`Synced ${challengeCache.length} active challenges`);
+
+  } catch (error) {
+    console.error('Challenges sync failed - keeping cache unchanged:', error);
+  }
+}
+
+// Save challenge (admin function)
+export async function saveChallenge(name: string, words: string[], activeFrom: string, activeTo: string): Promise<void> {
+  console.log(`Saving challenge: ${name}`);
+  
+  try {
+    // Insert new challenge to Supabase
+    const { error } = await supabase
+      .from('seasonal_challenges')
+      .insert({
+        name,
+        words,
+        active_from: activeFrom,
+        active_to: activeTo,
+        version: 1,
+        updated_at: new Date().toISOString()
+      });
+
+    if (error) {
+      console.error('Failed to save challenge to Supabase:', error);
+      Alert.alert('Error', 'Failed to save challenge');
+      return;
+    }
+
+    // Sync challenges immediately to update cache
+    await syncChallenges();
+    
+    Alert.alert('Success', `Challenge "${name}" saved successfully`);
+    console.log(`Successfully saved challenge: ${name}`);
+
+  } catch (error) {
+    console.error('Save challenge failed:', error);
+    Alert.alert('Error', 'Failed to save challenge');
+  }
 }

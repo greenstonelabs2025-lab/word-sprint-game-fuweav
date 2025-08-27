@@ -5,14 +5,16 @@ import MainMenu from '../components/MainMenu';
 import WordSprintGame from '../WordSprintGame';
 import DailyChallenge from '../components/DailyChallenge';
 import StoreScreen from '../components/StoreScreen';
+import ChallengeGame from '../components/ChallengeGame';
 import { commonStyles } from '../styles/commonStyles';
 import * as BillingService from '../billing/BillingService';
 import { initAnalytics } from '../src/analytics/AnalyticsService';
 import { submitPendingFeedback } from '../src/feedback/FeedbackService';
-import { initializeCache } from '../src/levelsync/SyncService';
+import { initializeCache, syncChallenges } from '../src/levelsync/SyncService';
 
 export default function MainScreen() {
-  const [screen, setScreen] = useState<'menu' | 'game' | 'daily' | 'store'>('menu');
+  const [screen, setScreen] = useState<'menu' | 'game' | 'daily' | 'store' | 'challenge'>('menu');
+  const [challengeData, setChallengeData] = useState<{ name: string; words: string[] } | null>(null);
 
   useEffect(() => {
     // Initialize services on app start
@@ -33,6 +35,10 @@ export default function MainScreen() {
         // Initialize word sets cache
         await initializeCache();
         console.log('Word sets cache initialized on app start');
+        
+        // Sync challenges
+        await syncChallenges();
+        console.log('Challenges synced on app start');
       } catch (error) {
         console.error('Failed to initialize services on app start:', error);
       }
@@ -50,6 +56,10 @@ export default function MainScreen() {
           onStart={() => setScreen('game')}
           onDailyChallenge={() => setScreen('daily')}
           onStore={() => setScreen('store')}
+          onChallengeGame={(challengeName, words) => {
+            setChallengeData({ name: challengeName, words });
+            setScreen('challenge');
+          }}
         />
       </View>
     );
@@ -67,6 +77,22 @@ export default function MainScreen() {
     return (
       <View style={commonStyles.wrapper}>
         <StoreScreen onExit={() => setScreen('menu')} />
+      </View>
+    );
+  }
+
+  if (screen === 'challenge' && challengeData) {
+    return (
+      <View style={commonStyles.wrapper}>
+        <ChallengeGame 
+          visible={true}
+          challengeName={challengeData.name}
+          words={challengeData.words}
+          onExit={() => {
+            setChallengeData(null);
+            setScreen('menu');
+          }}
+        />
       </View>
     );
   }

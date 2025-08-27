@@ -6,6 +6,7 @@ import Button from './Button';
 import SettingsPanel from './SettingsPanel';
 import FeedbackModal from './FeedbackModal';
 import LevelDesigner from './LevelDesigner';
+import ChallengeList from './ChallengeList';
 import { colors, commonStyles } from '../styles/commonStyles';
 import { isDailyChallengeCompleted } from '../utils/dailyChallenge';
 
@@ -13,13 +14,15 @@ interface MainMenuProps {
   onStart: () => void;
   onDailyChallenge: () => void;
   onStore: () => void;
+  onChallengeGame?: (challengeName: string, words: string[]) => void;
 }
 
-export default function MainMenu({ onStart, onDailyChallenge, onStore }: MainMenuProps) {
+export default function MainMenu({ onStart, onDailyChallenge, onStore, onChallengeGame }: MainMenuProps) {
   const [rulesVisible, setRulesVisible] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [showLevelDesigner, setShowLevelDesigner] = useState(false);
+  const [showChallengeList, setShowChallengeList] = useState(false);
   const [isDailyChallengeCompletedToday, setIsDailyChallengeCompletedToday] = useState(false);
 
   useEffect(() => {
@@ -115,6 +118,12 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore }: MainMen
               isDailyChallengeCompletedToday && styles.completedDailyButton
             ]}
             textStyle={isDailyChallengeCompletedToday ? styles.completedDailyButtonText : undefined}
+          />
+
+          <Button
+            text="Challenges"
+            onPress={() => setShowChallengeList(true)}
+            style={styles.challengesButton}
           />
 
           <Button
@@ -222,6 +231,16 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore }: MainMen
         visible={showLevelDesigner} 
         onClose={() => setShowLevelDesigner(false)} 
       />
+
+      {/* Challenge List */}
+      <ChallengeList 
+        visible={showChallengeList} 
+        onClose={() => setShowChallengeList(false)}
+        onChallengeSelect={(challengeName, words) => {
+          setShowChallengeList(false);
+          onChallengeGame?.(challengeName, words);
+        }}
+      />
     </View>
   );
 }
@@ -276,6 +295,10 @@ const styles = StyleSheet.create({
   },
   completedDailyButtonText: {
     color: '#ffffff',
+  },
+  challengesButton: {
+    backgroundColor: '#8E24AA',
+    width: '100%',
   },
   storeButton: {
     backgroundColor: '#FF6F00',

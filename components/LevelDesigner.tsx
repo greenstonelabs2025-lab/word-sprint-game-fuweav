@@ -18,7 +18,10 @@ import {
   saveTheme, 
   deleteTheme, 
   syncWordSets,
-  initializeCache 
+  initializeCache,
+  getChallengesCache,
+  syncChallenges,
+  saveChallenge
 } from '../src/levelsync/SyncService';
 
 interface LevelDesignerProps {
@@ -32,14 +35,30 @@ interface WordSetCache {
   versions: { [theme: string]: number };
 }
 
+interface ChallengeCache {
+  name: string;
+  words: string[];
+  version: number;
+}
+
 const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'wordsets' | 'challenges'>('wordsets');
   const [cache, setCache] = useState<WordSetCache>({ themes: [], bank: {}, versions: {} });
+  const [challenges, setChallenges] = useState<ChallengeCache[]>([]);
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
   const [words, setWords] = useState<string[]>(Array(15).fill(''));
   const [errors, setErrors] = useState<string[]>(Array(15).fill(''));
   const [saving, setSaving] = useState(false);
+  
+  // Challenge form state
+  const [challengeName, setChallengeName] = useState('');
+  const [challengeWords, setChallengeWords] = useState<string[]>(Array(15).fill(''));
+  const [challengeErrors, setChallengeErrors] = useState<string[]>(Array(15).fill(''));
+  const [activeFrom, setActiveFrom] = useState('');
+  const [activeTo, setActiveTo] = useState('');
+  
   const { width } = useWindowDimensions();
 
   const isTablet = width > 768;
@@ -103,6 +122,11 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
       if (currentCache.themes.length > 0 && !selectedTheme) {
         setSelectedTheme(currentCache.themes[0]);
       }
+      
+      // Load challenges
+      await syncChallenges();
+      const currentChallenges = await getChallengesCache();
+      setChallenges(currentChallenges);
     } catch (error) {
       console.error('Failed to load cache:', error);
     }
@@ -234,6 +258,100 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
     );
   };
 
+  const handleNewChallenge = () => {
+    setChallengeName('');
+    setChallengeWords(Array(15).fill(''));
+    setChallengeErrors(Array(15).fill(''));
+    
+    // Set default dates (today to 7 days from now)
+    const today = new Date();
+    const nextWeek = new Date(today);
+    nextWeek.setDate(today.getDate() + 7);
+    
+    setActiveFrom(today.toISOString().split('T')[0]);
+    setActiveTo(nextWeek.toISOString().split('T')[0]);
+  };
+
+  const validateChallengeWords = (): boolean => {
+    const newErrors = Array(15).fill('');
+    let isValid = true;
+    const nonEmptyWords = challengeWords.filter(word => word.trim() !== '');
+    
+    if (nonEmptyWords.length < 15) {
+      Alert.alert('Validation Error', 'Please provide at least 15 words for the challenge');
+      return false;
+    }
+
+    const seenWords = new Set<string>();
+
+    challengeWords.forEach((word, index) => {
+      const trimmed = word.trim().toLowerCase();
+      
+      if (trimmed === '') {
+        newErrors[index] = 'Required';
+        isValid = false;
+      } else if (trimmed.length < 3 || trimmed.length > 12) {
+        newErrors[index] = '3-12 chars';
+        isValid = false;
+      } else if (!/^[a-z]+$/.test(trimmed)) {
+        newErrors[index] = 'Lowercase letters only';
+        isValid = false;
+      } else if (seenWords.has(trimmed)) {
+        newErrors[index] = 'Duplicate';
+        isValid = false;
+      } else {
+        seenWords.add(trimmed);
+      }
+    });
+
+    setChallengeErrors(newErrors);
+    return isValid;
+  };
+
+  const handleSaveChallenge = async () => {
+    if (!challengeName.trim()) {
+      Alert.alert('Error', 'Please enter a challenge name');
+      return;
+    }
+
+    if (!activeFrom || !activeTo) {
+      Alert.alert('Error', 'Please set active dates');
+      return;
+    }
+
+    if (new Date(activeFrom) >= new Date(activeTo)) {
+      Alert.alert('Error', 'End date must be after start date');
+      return;
+    }
+
+    if (!validateChallengeWords()) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const cleanWords = challengeWords
+        .filter(word => word.trim() !== '')
+        .map(word => word.trim().toLowerCase());
+      
+      await saveChallenge(challengeName.trim(), cleanWords, activeFrom, activeTo);
+      
+      // Reset form
+      setChallengeName('');
+      setChallengeWords(Array(15).fill(''));
+      setChallengeErrors(Array(15).fill(''));
+      
+      // Refresh challenges
+      await syncChallenges();
+      const updatedChallenges = await getChallengesCache();
+      setChallenges(updatedChallenges);
+    } catch (error) {
+      console.error('Save challenge failed:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
@@ -286,7 +404,28 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.content, isTablet && styles.contentTablet]}>
+        {/* Tabs */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'wordsets' && styles.activeTab]}
+            onPress={() => setActiveTab('wordsets')}
+          >
+            <Text style={[styles.tabText, activeTab === 'wordsets' && styles.activeTabText]}>
+              Word Sets
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'challenges' && styles.activeTab]}
+            onPress={() => setActiveTab('challenges')}
+          >
+            <Text style={[styles.tabText, activeTab === 'challenges' && styles.activeTabText]}>
+              Challenges
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {activeTab === 'wordsets' ? (
+          <View style={[styles.content, isTablet && styles.contentTablet]}>
           {/* Left Panel - Theme List */}
           <View style={[styles.leftPanel, isTablet && styles.leftPanelTablet]}>
             <View style={styles.panelHeader}>
@@ -404,6 +543,111 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
             )}
           </View>
         </View>
+        ) : (
+          /* Challenges Tab */
+          <View style={styles.challengesContainer}>
+            <ScrollView style={styles.challengesScroll} contentContainerStyle={styles.challengesContent}>
+              <View style={styles.challengeForm}>
+                <Text style={styles.formTitle}>Create New Challenge</Text>
+                
+                <View style={styles.formRow}>
+                  <Text style={styles.formLabel}>Challenge Name</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={challengeName}
+                    onChangeText={setChallengeName}
+                    placeholder="e.g., Halloween Challenge"
+                    autoCapitalize="words"
+                  />
+                </View>
+
+                <View style={styles.formRow}>
+                  <View style={styles.dateContainer}>
+                    <View style={styles.dateField}>
+                      <Text style={styles.formLabel}>Active From</Text>
+                      <TextInput
+                        style={styles.formInput}
+                        value={activeFrom}
+                        onChangeText={setActiveFrom}
+                        placeholder="YYYY-MM-DD"
+                      />
+                    </View>
+                    <View style={styles.dateField}>
+                      <Text style={styles.formLabel}>Active To</Text>
+                      <TextInput
+                        style={styles.formInput}
+                        value={activeTo}
+                        onChangeText={setActiveTo}
+                        placeholder="YYYY-MM-DD"
+                      />
+                    </View>
+                  </View>
+                </View>
+
+                <Text style={styles.formLabel}>Words (minimum 15)</Text>
+                <View style={styles.challengeWordsGrid}>
+                  {challengeWords.map((word, index) => (
+                    <View key={index} style={styles.challengeWordContainer}>
+                      <Text style={styles.wordNumber}>{index + 1}</Text>
+                      <TextInput
+                        style={[
+                          styles.challengeWordInput,
+                          challengeErrors[index] && styles.wordInputError
+                        ]}
+                        value={word}
+                        onChangeText={(text) => {
+                          const newWords = [...challengeWords];
+                          newWords[index] = text;
+                          setChallengeWords(newWords);
+                          
+                          if (challengeErrors[index]) {
+                            const newErrors = [...challengeErrors];
+                            newErrors[index] = '';
+                            setChallengeErrors(newErrors);
+                          }
+                        }}
+                        placeholder="word"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                      {challengeErrors[index] ? (
+                        <Text style={styles.challengeErrorText}>{challengeErrors[index]}</Text>
+                      ) : null}
+                    </View>
+                  ))}
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.saveChallengeButton,
+                    saving && styles.buttonDisabled
+                  ]}
+                  onPress={handleSaveChallenge}
+                  disabled={saving}
+                >
+                  <Text style={styles.saveChallengeButtonText}>
+                    {saving ? 'Saving Challenge...' : 'Save Challenge'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Existing Challenges */}
+              {challenges.length > 0 && (
+                <View style={styles.existingChallenges}>
+                  <Text style={styles.existingChallengesTitle}>Existing Challenges</Text>
+                  {challenges.map((challenge, index) => (
+                    <View key={index} style={styles.challengeItem}>
+                      <Text style={styles.challengeItemName}>{challenge.name}</Text>
+                      <Text style={styles.challengeItemInfo}>
+                        {challenge.words.length} words • v{challenge.version}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        )}
       </View>
     </Modal>
   );
@@ -641,6 +885,150 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  // Tab styles
+  tabContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTab: {
+    borderBottomColor: colors.primary,
+  },
+  tabText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  activeTabText: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  // Challenge styles
+  challengesContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  challengesScroll: {
+    flex: 1,
+  },
+  challengesContent: {
+    padding: 20,
+  },
+  challengeForm: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  formTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 20,
+  },
+  formRow: {
+    marginBottom: 16,
+  },
+  formLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  formInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: colors.text,
+    backgroundColor: colors.background,
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  dateField: {
+    flex: 1,
+  },
+  challengeWordsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 20,
+  },
+  challengeWordContainer: {
+    width: '48%',
+    minWidth: 120,
+  },
+  wordNumber: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  challengeWordInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 6,
+    padding: 8,
+    fontSize: 14,
+    color: colors.text,
+    backgroundColor: colors.background,
+  },
+  challengeErrorText: {
+    fontSize: 10,
+    color: colors.error,
+    marginTop: 2,
+  },
+  saveChallengeButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  saveChallengeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  existingChallenges: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  existingChallengesTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 16,
+  },
+  challengeItem: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  challengeItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  challengeItemInfo: {
+    fontSize: 14,
+    color: colors.textSecondary,
   },
 });
 

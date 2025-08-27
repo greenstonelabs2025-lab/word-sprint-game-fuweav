@@ -14,6 +14,7 @@ export const colors = {
   card: '#193cb8',       // Keeping dark card background
   white: '#ffffff',      // White color
   error: '#ff4444',      // Error color
+  success: '#4CAF50',    // Success color
   border: '#2a3441',     // Border color
 };
 
