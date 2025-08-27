@@ -1,8 +1,8 @@
 
 {
   "expo": {
-    "name": "Word Sprint",
-    "slug": "word-sprint",
+    "name": "word-sprint-game-fuweav",
+    "slug": "word-sprint-game-fuweav",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/natively-dark.png",
@@ -26,8 +26,11 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.wordsprint.app",
-      "versionCode": 1
+      "package": "com.greenstonelabs.wordsprint",
+      "versionCode": 1,
+      "compileSdkVersion": 34,
+      "targetSdkVersion": 34,
+      "buildToolsVersion": "34.0.0"
     },
     "web": {
       "favicon": "./assets/images/final_quest_240x240.png",

@@ -1,3 +1,4 @@
+
 {
   "build": {
     "development": {
@@ -15,11 +16,19 @@
     "production": {
       "autoIncrement": true,
       "android": {
-        "buildType": "aab"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      }
+    },
+    "production-aab": {
+      "extends": "production",
+      "android": {
+        "buildType": "aab",
+        "gradleCommand": ":app:bundleRelease"
       }
     },
     "play-console": {
-      "extends": "production",
+      "extends": "production-aab",
       "android": {
         "buildType": "aab",
         "gradleCommand": ":app:bundleRelease",

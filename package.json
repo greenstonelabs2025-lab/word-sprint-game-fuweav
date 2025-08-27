@@ -1,5 +1,6 @@
+
 {
-  "name": "Natively",
+  "name": "word-sprint-game-fuweav",
   "version": "1.0.0",
   "main": "index.ts",
   "scripts": {
@@ -9,6 +10,11 @@
     "web": "EXPO_NO_TELEMETRY=1 expo start --web",
     "build:web": "expo export -p web && npx workbox generateSW workbox-config.js",
     "build:android": "expo prebuild -p android",
+    "build:apk": "node scripts/build.js apk android",
+    "build:aab": "node scripts/build.js aab android",
+    "build:preview": "node scripts/build.js preview android",
+    "build:play-console": "node scripts/build.js play-console android",
+    "build:clean": "node scripts/build.js apk android --clean",
     "lint": "eslint ."
   },
   "dependencies": {
