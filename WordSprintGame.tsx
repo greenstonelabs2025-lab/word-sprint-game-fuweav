@@ -18,6 +18,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { themes, wordBank } from "./wordBank";
 import SettingsPanel from "./components/SettingsPanel";
 import FeedbackModal from "./components/FeedbackModal";
+import GradientButton from "./src/ui/GradientButton";
 import { updatePoints } from "./components/StoreScreen";
 import { colors } from "./styles/commonStyles";
 import { track } from "./src/analytics/AnalyticsService";
@@ -148,28 +149,20 @@ function ConfirmationPopup({ visible, title, cost, currentPoints, onConfirm, onC
           )}
           
           <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.cancelButton]}
+            <GradientButton
+              title="Cancel"
               onPress={onCancel}
-            >
-              <Text style={styles.modalButtonText}>Cancel</Text>
-            </TouchableOpacity>
+              colors={[colors.grey + '60', colors.grey + '40']}
+              style={styles.modalButton}
+            />
             
-            <TouchableOpacity
-              style={[
-                styles.modalButton, 
-                styles.confirmButton,
-                !hasEnoughPoints && styles.disabledModalButton
-              ]}
+            <GradientButton
+              title="Confirm"
               onPress={hasEnoughPoints ? onConfirm : onCancel}
-            >
-              <Text style={[
-                styles.modalButtonText,
-                !hasEnoughPoints && styles.disabledModalButtonText
-              ]}>
-                Confirm
-              </Text>
-            </TouchableOpacity>
+              colors={hasEnoughPoints ? [colors.accent, colors.primary] : [colors.grey + '40', colors.grey + '20']}
+              disabled={!hasEnoughPoints}
+              style={styles.modalButton}
+            />
           </View>
         </View>
       </View>
@@ -229,9 +222,6 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
   // Animation values
   const scaleWord = useRef(new Animated.Value(1)).current;
   const shake = useRef(new Animated.Value(0)).current;
-  const pressScaleSubmit = useRef(new Animated.Value(1)).current;
-  const pressScaleHint = useRef(new Animated.Value(1)).current;
-  const pressScaleAnswer = useRef(new Animated.Value(1)).current;
   const pressScaleBackspace = useRef(new Animated.Value(1)).current;
   const pressScaleClear = useRef(new Animated.Value(1)).current;
   const pressScaleShuffle = useRef(new Animated.Value(1)).current;
@@ -981,19 +971,21 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
           <Text style={styles.syncRequiredText}>
             Sync required to load word sets. Please check your connection and try again.
           </Text>
-          <TouchableOpacity
-            style={styles.syncButton}
+          <GradientButton
+            title="Retry Sync"
             onPress={async () => {
               setShowSyncRequired(false);
               await loadWordSetsCache();
             }}
-          >
-            <Text style={styles.syncButtonText}>Retry Sync</Text>
-          </TouchableOpacity>
+            colors={[colors.primary, colors.accent]}
+          />
           {onExit && (
-            <TouchableOpacity style={styles.backButton} onPress={onExit}>
-              <Text style={styles.backButtonText}>Back to Menu</Text>
-            </TouchableOpacity>
+            <GradientButton
+              title="Back to Menu"
+              onPress={onExit}
+              colors={[colors.grey + '60', colors.grey + '40']}
+              style={{ marginTop: 16 }}
+            />
           )}
         </View>
       </View>
@@ -1104,41 +1096,25 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
         
         {/* Game Action Buttons */}
         <View style={styles.buttonContainer}>
-          <Pressable
-            style={[styles.gameButton, { backgroundColor: buttonColors.submit }]}
+          <GradientButton
+            title="Submit"
             onPress={check}
-            {...createPressHandlers(pressScaleSubmit)}
-          >
-            <Animated.View style={{ transform: [{ scale: pressScaleSubmit }] }}>
-              <Text style={[styles.gameButtonText, settings.highContrast && { color: '#ffffff' }]}>
-                Submit
-              </Text>
-            </Animated.View>
-          </Pressable>
+            colors={["#00E676", "#00B248"]}
+          />
           
-          <Pressable
-            style={[styles.gameButton, { backgroundColor: buttonColors.hint }]}
+          <GradientButton
+            title={points >= 50 ? 'Hint (50 pts)' : 'Need 50 pts'}
             onPress={hint}
-            {...createPressHandlers(pressScaleHint)}
-          >
-            <Animated.View style={{ transform: [{ scale: pressScaleHint }] }}>
-              <Text style={[styles.gameButtonText, settings.highContrast && { color: '#ffffff' }]}>
-                {points >= 50 ? 'Hint (50 pts)' : 'Need 50 pts'}
-              </Text>
-            </Animated.View>
-          </Pressable>
+            colors={["#FFD54F", "#FFA000"]}
+            disabled={points < 50}
+          />
           
-          <Pressable
-            style={[styles.gameButton, { backgroundColor: buttonColors.answer }]}
+          <GradientButton
+            title={points >= 200 ? 'Answer (200 pts)' : 'Need 200 pts'}
             onPress={answer}
-            {...createPressHandlers(pressScaleAnswer)}
-          >
-            <Animated.View style={{ transform: [{ scale: pressScaleAnswer }] }}>
-              <Text style={[styles.gameButtonText, settings.highContrast && { color: '#ffffff' }]}>
-                {points >= 200 ? 'Answer (200 pts)' : 'Need 200 pts'}
-              </Text>
-            </Animated.View>
-          </Pressable>
+            colors={["#FF8A80", "#E53935"]}
+            disabled={points < 200}
+          />
         </View>
       </ScrollView>
 
@@ -1154,22 +1130,22 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
             <Text style={styles.stageCompleteText}>Total Points: {points}</Text>
             <Text style={styles.stageCompleteText}>Streak: {streak}</Text>
             <View style={styles.stageCompleteButtons}>
-              <TouchableOpacity
-                style={[styles.stageCompleteButton, styles.nextStageButton]}
+              <GradientButton
+                title="Next Stage"
                 onPress={nextStage}
-              >
-                <Text style={styles.stageCompleteButtonText}>Next Stage</Text>
-              </TouchableOpacity>
+                colors={[colors.accent, colors.primary]}
+                style={styles.stageCompleteButton}
+              />
               {onExit && (
-                <TouchableOpacity
-                  style={[styles.stageCompleteButton, styles.menuStageButton]}
+                <GradientButton
+                  title="Menu"
                   onPress={() => {
                     setShowStageComplete(false);
                     handleMenuPress();
                   }}
-                >
-                  <Text style={styles.stageCompleteButtonText}>Menu</Text>
-                </TouchableOpacity>
+                  colors={[colors.grey + '60', colors.grey + '40']}
+                  style={styles.stageCompleteButton}
+                />
               )}
             </View>
           </View>
@@ -1206,29 +1182,29 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
           <View style={styles.gearMenuContent}>
             <Text style={styles.gearMenuTitle}>Game Menu</Text>
             
-            <TouchableOpacity
-              style={styles.gearMenuItem}
+            <GradientButton
+              title="⚙️ Settings"
               onPress={() => {
                 setShowGearMenu(false);
                 setShowSettings(true);
               }}
-            >
-              <Text style={styles.gearMenuItemText}>⚙️ Settings</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
+              colors={[colors.backgroundAlt, colors.grey + '60']}
               style={styles.gearMenuItem}
-              onPress={handleFeedbackPress}
-            >
-              <Text style={styles.gearMenuItemText}>💬 Feedback</Text>
-            </TouchableOpacity>
+            />
             
-            <TouchableOpacity
-              style={[styles.gearMenuItem, styles.gearMenuCancel]}
+            <GradientButton
+              title="💬 Feedback"
+              onPress={handleFeedbackPress}
+              colors={[colors.backgroundAlt, colors.grey + '60']}
+              style={styles.gearMenuItem}
+            />
+            
+            <GradientButton
+              title="Cancel"
               onPress={() => setShowGearMenu(false)}
-            >
-              <Text style={[styles.gearMenuItemText, styles.gearMenuCancelText]}>Cancel</Text>
-            </TouchableOpacity>
+              colors={[colors.grey + '40', colors.grey + '20']}
+              style={[styles.gearMenuItem, styles.gearMenuCancel]}
+            />
           </View>
         </View>
       </Modal>
@@ -1527,22 +1503,6 @@ const styles = StyleSheet.create({
     maxWidth: 300,
     gap: 12,
   },
-  gameButton: {
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  gameButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
   // Modal styles
   modalOverlay: {
     flex: 1,
@@ -1598,28 +1558,6 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: colors.grey + '40',
-  },
-  confirmButton: {
-    backgroundColor: colors.accent,
-  },
-  disabledModalButton: {
-    backgroundColor: colors.grey + '20',
-    opacity: 0.5,
-  },
-  modalButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  disabledModalButtonText: {
-    color: colors.grey,
   },
   // Stage complete modal
   stageCompleteModal: {
@@ -1651,21 +1589,6 @@ const styles = StyleSheet.create({
   },
   stageCompleteButton: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  nextStageButton: {
-    backgroundColor: colors.accent,
-  },
-  menuStageButton: {
-    backgroundColor: colors.grey + '40',
-  },
-  stageCompleteButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
   },
   // Gear menu styles
   gearMenuContent: {
@@ -1685,24 +1608,10 @@ const styles = StyleSheet.create({
   },
   gearMenuItem: {
     width: '100%',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 8,
     marginBottom: 8,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-  },
-  gearMenuItemText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text,
   },
   gearMenuCancel: {
-    backgroundColor: colors.grey + '40',
     marginTop: 8,
-  },
-  gearMenuCancelText: {
-    color: colors.grey,
   },
   // Sync required styles
   syncRequiredContainer: {
@@ -1724,29 +1633,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 32,
     lineHeight: 24,
-  },
-  syncButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  syncButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  backButton: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  backButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   // Loading styles
   loadingContainer: {

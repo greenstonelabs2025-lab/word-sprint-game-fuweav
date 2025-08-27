@@ -17,6 +17,7 @@ import { supabase } from '../app/integrations/supabase/client';
 import { colors } from '../styles/commonStyles';
 import { track } from '../src/analytics/AnalyticsService';
 import { loadSettings } from '../utils/settings';
+import GradientButton from '../src/ui/GradientButton';
 
 interface FeedbackModalProps {
   visible: boolean;
@@ -379,42 +380,21 @@ export default function FeedbackModal({
 
           {/* Action Buttons */}
           <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.cancelButton,
-                settings.highContrast && styles.highContrastBorder,
-              ]}
+            <GradientButton
+              title="Cancel"
               onPress={handleClose}
+              colors={[colors.grey + '60', colors.grey + '40']}
               disabled={isSubmitting}
-            >
-              <Text style={[styles.buttonText, styles.cancelButtonText, settings.highContrast && styles.highContrastText]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
+              style={styles.button}
+            />
 
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.submitButton,
-                isSubmitDisabled && styles.submitButtonDisabled,
-                settings.highContrast && styles.highContrastBorder,
-                settings.highContrast && !isSubmitDisabled && styles.highContrastSubmit,
-              ]}
+            <GradientButton
+              title={isSubmitting ? 'Sending...' : 'Send'}
               onPress={submitFeedback}
+              colors={isSubmitDisabled ? [colors.grey + '40', colors.grey + '20'] : [colors.accent, colors.primary]}
               disabled={isSubmitDisabled}
-            >
-              <Text
-                style={[
-                  styles.buttonText,
-                  styles.submitButtonText,
-                  isSubmitDisabled && styles.submitButtonTextDisabled,
-                  settings.highContrast && styles.highContrastText,
-                ]}
-              >
-                {isSubmitting ? 'Sending...' : 'Send'}
-              </Text>
-            </TouchableOpacity>
+              style={styles.button}
+            />
           </View>
         </ScrollView>
       </View>
@@ -532,35 +512,6 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  cancelButton: {
-    backgroundColor: colors.backgroundAlt,
-    borderColor: colors.grey + '40',
-  },
-  submitButton: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  submitButtonDisabled: {
-    backgroundColor: colors.grey + '40',
-    borderColor: colors.grey + '40',
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  cancelButtonText: {
-    color: colors.text,
-  },
-  submitButtonText: {
-    color: '#ffffff',
-  },
-  submitButtonTextDisabled: {
-    color: colors.grey,
   },
   // High contrast styles
   highContrastText: {
@@ -582,9 +533,5 @@ const styles = StyleSheet.create({
   highContrastChip: {
     borderColor: '#ffffff',
     backgroundColor: '#333333',
-  },
-  highContrastSubmit: {
-    backgroundColor: '#00FF00',
-    borderColor: '#00FF00',
   },
 });

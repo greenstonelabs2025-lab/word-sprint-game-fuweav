@@ -17,6 +17,7 @@ import { colors } from '../styles/commonStyles';
 import * as BillingService from '../billing/BillingService';
 import { updatePoints } from '../utils/pointsManager';
 import { track } from '../src/analytics/AnalyticsService';
+import GradientButton from '../src/ui/GradientButton';
 
 interface StoreScreenProps {
   onExit: () => void;
@@ -84,19 +85,19 @@ function ConfirmPurchaseModal({ visible, item, currentPoints, onConfirm, onCance
           <Text style={styles.modalCurrentPoints}>Current points: {currentPoints}</Text>
           
           <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.cancelButton]}
+            <GradientButton
+              title="Cancel"
               onPress={onCancel}
-            >
-              <Text style={styles.modalButtonText}>Cancel</Text>
-            </TouchableOpacity>
+              colors={[colors.grey + '60', colors.grey + '40']}
+              style={styles.modalButton}
+            />
             
-            <TouchableOpacity
-              style={[styles.modalButton, styles.confirmButton]}
+            <GradientButton
+              title="Confirm"
               onPress={onConfirm}
-            >
-              <Text style={styles.modalButtonText}>Confirm</Text>
-            </TouchableOpacity>
+              colors={[colors.accent, colors.primary]}
+              style={styles.modalButton}
+            />
           </View>
         </View>
       </View>
@@ -278,36 +279,32 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
     }
   };
 
-  const renderPurchaseRow = (item: PurchaseItem) => (
-    <Pressable
-      key={item.id}
-      style={[
-        styles.purchaseRow, 
-        { borderLeftColor: item.color },
-        inFlight && styles.disabledRow
-      ]}
-      onPress={() => handlePurchase(item)}
-      disabled={inFlight}
-    >
-      <View style={styles.purchaseLeft}>
-        <View style={styles.purchaseHeader}>
-          <Text style={styles.purchaseName}>{item.name}</Text>
+  const renderPurchaseRow = (item: PurchaseItem) => {
+    const gradientColors = item.isBest 
+      ? ['#4CAF50', '#2E7D32'] 
+      : [item.color, item.color.replace('9', '6')]; // Slightly darker second color
+    
+    return (
+      <View key={item.id} style={styles.purchaseRowContainer}>
+        <GradientButton
+          title={`${item.name} - ${item.price}`}
+          icon={item.isBest ? '⭐' : '💎'}
+          onPress={() => handlePurchase(item)}
+          colors={gradientColors}
+          disabled={inFlight}
+          style={styles.purchaseButton}
+        />
+        <View style={styles.purchaseInfo}>
+          <Text style={styles.purchasePoints}>+{item.points} points</Text>
           {item.isBest && (
             <View style={styles.bestBadge}>
-              <Text style={styles.bestBadgeText}>Best</Text>
+              <Text style={styles.bestBadgeText}>Best Value</Text>
             </View>
           )}
         </View>
-        <Text style={styles.purchasePrice}>{item.price}</Text>
       </View>
-      
-      <View style={[styles.pointsPill, { backgroundColor: item.color }]}>
-        <Text style={styles.pointsPillText}>
-          {inFlight ? 'Processing...' : `+${item.points}`}
-        </Text>
-      </View>
-    </Pressable>
-  );
+    );
+  };
 
   const renderToggleRow = (title: string, description: string, value: boolean, onToggle: (value: boolean) => void, disabled = false) => (
     <View style={[styles.toggleRow, disabled && styles.disabledToggleRow]}>
@@ -329,9 +326,12 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={onExit}>
-          <Text style={styles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
+        <GradientButton
+          title="← Back"
+          onPress={onExit}
+          colors={[colors.primary, colors.accent]}
+          style={styles.backButton}
+        />
         <Text style={styles.title}>Store</Text>
         <View style={styles.headerSpacer} />
       </View>
@@ -388,11 +388,28 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.restoreButton} onPress={restorePurchases}>
-            <Text style={styles.restoreButtonText}>Restore purchases</Text>
-          </TouchableOpacity>
+          <GradientButton
+            title="Restore purchases"
+            onPress={restorePurchases}
+            colors={[colors.grey + '60', colors.grey + '40']}
+            style={styles.restoreButton}
+          />
         </View>
       </ScrollView>
+
+      {/* Purchase Confirmation Modal */}
+      <ConfirmPurchaseModal
+        visible={showPurchaseModal}
+        item={selectedItem}
+        currentPoints={points}
+        onConfirm={() => {
+          setShowPurchaseModal(false);
+          if (selectedItem) {
+            handlePurchase(selectedItem);
+          }
+        }}
+        onCancel={() => setShowPurchaseModal(false)}
+      />
     </View>
   );
 }
@@ -414,15 +431,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.grey + '20',
   },
   backButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: colors.primary,
-    borderRadius: 6,
-  },
-  backButtonText: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '600',
+    width: 80,
   },
   title: {
     fontSize: 20,
@@ -430,7 +439,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   headerSpacer: {
-    width: 60,
+    width: 80,
   },
   scrollView: {
     flex: 1,
@@ -472,37 +481,22 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 16,
   },
-  purchaseRow: {
-    backgroundColor: colors.backgroundAlt,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+  purchaseRowContainer: {
+    marginBottom: 16,
+  },
+  purchaseButton: {
+    marginBottom: 8,
+  },
+  purchaseInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    paddingHorizontal: 16,
   },
-  disabledRow: {
-    opacity: 0.6,
-  },
-  purchaseLeft: {
-    flex: 1,
-  },
-  purchaseHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  purchaseName: {
-    fontSize: 16,
+  purchasePoints: {
+    fontSize: 14,
+    color: colors.accent,
     fontWeight: '600',
-    color: colors.text,
-    marginRight: 8,
   },
   bestBadge: {
     backgroundColor: '#4CAF50',
@@ -512,20 +506,6 @@ const styles = StyleSheet.create({
   },
   bestBadgeText: {
     fontSize: 12,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  purchasePrice: {
-    fontSize: 14,
-    color: colors.grey,
-  },
-  pointsPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  pointsPillText: {
-    fontSize: 14,
     fontWeight: 'bold',
     color: '#ffffff',
   },
@@ -564,13 +544,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   restoreButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  restoreButtonText: {
-    fontSize: 14,
-    color: colors.accent,
-    textDecorationLine: 'underline',
+    width: '60%',
   },
   modalOverlay: {
     flex: 1,
@@ -624,21 +598,6 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: colors.grey + '40',
-  },
-  confirmButton: {
-    backgroundColor: colors.accent,
-  },
-  modalButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
   },
 });
 

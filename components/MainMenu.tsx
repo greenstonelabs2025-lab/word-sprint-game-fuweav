@@ -19,6 +19,7 @@ import SettingsPanel from './SettingsPanel';
 import FeedbackModal from './FeedbackModal';
 import LevelDesigner from './LevelDesigner';
 import ChallengeList from './ChallengeList';
+import GradientButton from '../src/ui/GradientButton';
 import { colors, commonStyles } from '../styles/commonStyles';
 import { isDailyChallengeCompleted } from '../utils/dailyChallenge';
 import { getCache } from '../src/levelsync/SyncService';
@@ -31,145 +32,10 @@ interface MainMenuProps {
   onChallengeGame?: (challengeName: string, words: string[]) => void;
 }
 
-interface GradientButtonProps {
-  text: string;
-  emoji: string;
-  onPress: () => void;
-  gradientColors: string[];
-  style?: any;
-  hasActiveDaily?: boolean;
-  settings: Settings;
-}
-
 interface SecondaryButtonProps {
   text: string;
   onPress: () => void;
   settings: Settings;
-}
-
-function GradientButton({ 
-  text, 
-  emoji, 
-  onPress, 
-  gradientColors, 
-  style, 
-  hasActiveDaily = false,
-  settings 
-}: GradientButtonProps) {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  // Pulsing animation for daily challenge when active
-  useEffect(() => {
-    if (hasActiveDaily && !settings.reduceMotion) {
-      const pulse = () => {
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.05,
-            duration: 750,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 750,
-            useNativeDriver: true,
-          }),
-        ]).start(() => {
-          setTimeout(pulse, 1500);
-        });
-      };
-      pulse();
-    }
-  }, [hasActiveDaily, settings.reduceMotion]);
-
-  const handlePressIn = () => {
-    if (!settings.reduceMotion) {
-      Animated.timing(scaleAnim, {
-        toValue: 0.97,
-        duration: 100,
-        useNativeDriver: true,
-      }).start();
-    }
-    
-    if (settings.vibrate) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-  };
-
-  const handlePressOut = () => {
-    if (!settings.reduceMotion) {
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }).start();
-    }
-  };
-
-  const handlePress = () => {
-    onPress();
-  };
-
-  // High contrast mode colors
-  const getHighContrastColors = () => {
-    if (text.includes('New Game')) return ['#00FF00', '#00FF00'];
-    if (text.includes('Continue')) return ['#4DA3FF', '#4DA3FF'];
-    if (text.includes('Daily')) return ['#B466FF', '#B466FF'];
-    if (text.includes('Store')) return ['#FFA040', '#FFA040'];
-    return gradientColors;
-  };
-
-  const finalGradientColors = settings.highContrast ? getHighContrastColors() : gradientColors;
-
-  return (
-    <Animated.View 
-      style={[
-        { transform: [{ scale: scaleAnim }] },
-        hasActiveDaily && { transform: [{ scale: Animated.multiply(scaleAnim, pulseAnim) }] }
-      ]}
-    >
-      <TouchableOpacity
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        onPress={handlePress}
-        activeOpacity={0.9}
-        style={[styles.gradientButtonContainer, style]}
-      >
-        <LinearGradient
-          colors={finalGradientColors}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[
-            styles.gradientButton,
-            settings.highContrast && styles.highContrastButton,
-            hasActiveDaily && styles.dailyActiveButton
-          ]}
-        >
-          {/* Inner shadow overlays */}
-          {!settings.highContrast && (
-            <>
-              <View style={styles.innerShadowLight} />
-              <View style={styles.innerShadowDark} />
-            </>
-          )}
-          
-          <View style={styles.buttonContent}>
-            <Text style={styles.buttonEmoji} role="img" accessibilityLabel={`${text} icon`}>
-              {emoji}
-            </Text>
-            <Text style={[styles.buttonText, settings.highContrast && styles.highContrastButtonText]}>
-              {text}
-            </Text>
-          </View>
-        </LinearGradient>
-        
-        {/* Daily active border */}
-        {hasActiveDaily && !settings.reduceMotion && (
-          <View style={styles.dailyActiveBorder} />
-        )}
-      </TouchableOpacity>
-    </Animated.View>
-  );
 }
 
 function SecondaryButton({ text, onPress, settings }: SecondaryButtonProps) {
@@ -362,36 +228,31 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore, onChallen
         
         <View style={styles.buttonContainer}>
           <GradientButton
-            text="New Game"
-            emoji="🆕"
+            title="New Game"
+            icon="🆕"
             onPress={newGame}
-            gradientColors={['#5EE7DF', '#0083B0']}
-            settings={settings}
+            colors={['#5EE7DF', '#0083B0']}
           />
           
           <GradientButton
-            text="Continue"
-            emoji="🔁"
+            title="Continue"
+            icon="🔁"
             onPress={continueGame}
-            gradientColors={['#6A85B6', '#BAC8E0']}
-            settings={settings}
+            colors={['#6A85B6', '#BAC8E0']}
           />
           
           <GradientButton
-            text={isDailyChallengeCompletedToday ? "Daily Complete ✓" : "Daily Challenge"}
-            emoji="🏆"
+            title={isDailyChallengeCompletedToday ? "Daily Complete ✓" : "Daily Challenge"}
+            icon="🏆"
             onPress={handleDailyChallenge}
-            gradientColors={['#9D50BB', '#6E48AA']}
-            hasActiveDaily={hasActiveDaily}
-            settings={settings}
+            colors={['#9D50BB', '#6E48AA']}
           />
 
           <GradientButton
-            text="Store"
-            emoji="🛒"
+            title="Store"
+            icon="🛒"
             onPress={handleStore}
-            gradientColors={['#FF8C00', '#FF512F']}
-            settings={settings}
+            colors={['#FF8C00', '#FF512F']}
           />
           
           {/* Secondary buttons */}
@@ -466,9 +327,10 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore, onChallen
               <Text style={styles.ruleText}>• Continue anytime from where you left off</Text>
             </View>
 
-            <Button
-              text="Close"
+            <GradientButton
+              title="Close"
               onPress={() => setRulesVisible(false)}
+              colors={[colors.primary, colors.accent]}
               style={styles.closeButton}
             />
           </ScrollView>
@@ -562,65 +424,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
   },
-  gradientButtonContainer: {
-    width: '100%',
-    position: 'relative',
-  },
-  gradientButton: {
-    height: 54,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  innerShadowLight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: '50%',
-    bottom: '50%',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderTopLeftRadius: 14,
-  },
-  innerShadowDark: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    left: '50%',
-    top: '50%',
-    backgroundColor: 'rgba(0,0,0,0.12)',
-    borderBottomRightRadius: 14,
-  },
-  buttonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    zIndex: 1,
-  },
-  buttonEmoji: {
-    fontSize: 20,
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  dailyActiveButton: {
-    // Additional styling for active daily challenge
-  },
-  dailyActiveBorder: {
-    position: 'absolute',
-    top: -2,
-    left: -2,
-    right: -2,
-    bottom: -2,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
   secondaryButtonsContainer: {
     width: '100%',
     flexDirection: 'row',
@@ -654,14 +457,6 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   // High contrast styles
-  highContrastButton: {
-    borderWidth: 3,
-    borderColor: '#ffffff',
-  },
-  highContrastButtonText: {
-    color: '#000000',
-    fontWeight: 'bold',
-  },
   highContrastSecondaryButton: {
     borderWidth: 2,
     borderColor: '#ffffff',
@@ -709,7 +504,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   closeButton: {
-    backgroundColor: colors.primary,
     marginTop: 20,
     alignSelf: 'center',
     width: '60%',

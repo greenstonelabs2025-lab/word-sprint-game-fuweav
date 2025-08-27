@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../styles/commonStyles';
 import { Settings, loadSettings, saveSetting, resetProgress } from '../utils/settings';
 import { track } from '../src/analytics/AnalyticsService';
+import GradientButton from '../src/ui/GradientButton';
 
 interface SettingsPanelProps {
   visible: boolean;
@@ -205,12 +206,12 @@ export default function SettingsPanel({ visible, onClose }: SettingsPanelProps) 
 
               {/* Reset Progress Button */}
               <View style={styles.dangerSection}>
-                <TouchableOpacity
-                  style={styles.resetButton}
+                <GradientButton
+                  title="Reset Progress"
                   onPress={handleResetProgress}
-                >
-                  <Text style={styles.resetButtonText}>Reset Progress</Text>
-                </TouchableOpacity>
+                  colors={[colors.error, '#c62828']}
+                  style={styles.resetButton}
+                />
               </View>
 
               {/* Footer */}
@@ -234,18 +235,18 @@ export default function SettingsPanel({ visible, onClose }: SettingsPanelProps) 
               This will reset stage, level and points. Are you sure?
             </Text>
             <View style={styles.confirmButtons}>
-              <TouchableOpacity
-                style={[styles.confirmButton, styles.cancelButton]}
+              <GradientButton
+                title="Cancel"
                 onPress={() => setShowResetConfirm(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.confirmButton, styles.confirmButtonDanger]}
+                colors={[colors.grey + '60', colors.grey + '40']}
+                style={styles.confirmButton}
+              />
+              <GradientButton
+                title="Confirm"
                 onPress={confirmResetProgress}
-              >
-                <Text style={styles.confirmButtonText}>Confirm</Text>
-              </TouchableOpacity>
+                colors={[colors.error, '#c62828']}
+                style={styles.confirmButton}
+              />
             </View>
           </View>
         </View>
@@ -337,16 +338,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.grey + '20',
   },
   resetButton: {
-    backgroundColor: colors.error,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  resetButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.white,
+    width: '100%',
   },
   footer: {
     fontSize: 12,
@@ -383,26 +375,6 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: colors.grey + '40',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  confirmButtonDanger: {
-    backgroundColor: colors.error,
-  },
-  confirmButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.white,
   },
   // Success modal styles
   successModal: {
