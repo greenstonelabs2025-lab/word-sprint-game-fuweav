@@ -8,6 +8,8 @@ import {
   StyleSheet,
   Alert,
   Platform,
+  Modal,
+  TouchableOpacity,
 } from 'react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -34,14 +36,102 @@ interface GameState {
   completedLevels: Set<string>;
 }
 
+interface ConfirmationPopupProps {
+  visible: boolean;
+  title: string;
+  cost: number;
+  currentPoints: number;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
 const STORAGE_KEYS = {
   GAME_STATE: 'word_sprint_game_state',
   POINTS: 'word_sprint_points',
 };
 
-// Scramble function as requested
+// Enhanced scramble function that ensures the result is always different from the original
 function scramble(word: string): string {
-  return word.split("").sort(() => Math.random() - 0.5).join("");
+  if (word.length <= 1) return word;
+  
+  let scrambledWord = word;
+  let attempts = 0;
+  const maxAttempts = 50; // Prevent infinite loops
+  
+  do {
+    scrambledWord = word
+      .split("")
+      .sort(() => Math.random() - 0.5)
+      .join("");
+    attempts++;
+  } while (scrambledWord === word && attempts < maxAttempts);
+  
+  // If we still have the original word after max attempts, manually scramble
+  if (scrambledWord === word) {
+    const letters = word.split("");
+    // Swap first two characters if possible
+    if (letters.length >= 2) {
+      [letters[0], letters[1]] = [letters[1], letters[0]];
+      scrambledWord = letters.join("");
+    }
+  }
+  
+  console.log(`Scrambled "${word}" to "${scrambledWord}"`);
+  return scrambledWord;
+}
+
+// Confirmation Popup Component
+function ConfirmationPopup({ visible, title, cost, currentPoints, onConfirm, onCancel }: ConfirmationPopupProps) {
+  const hasEnoughPoints = currentPoints >= cost;
+  
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={onCancel}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>{title}</Text>
+          <Text style={styles.modalCost}>Cost: {cost} points</Text>
+          <Text style={styles.modalPoints}>Your points: {currentPoints}</Text>
+          
+          {!hasEnoughPoints && (
+            <Text style={styles.modalWarning}>Not enough points!</Text>
+          )}
+          
+          <View style={styles.modalButtons}>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.cancelButton]}
+              onPress={onCancel}
+            >
+              <Text style={styles.modalButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.modalButton, 
+                styles.confirmButton,
+                !hasEnoughPoints && styles.disabledModalButton
+              ]}
+              onPress={hasEnoughPoints ? onConfirm : () => {
+                Alert.alert("Not enough points", "You need more points to use this feature.");
+                onCancel();
+              }}
+            >
+              <Text style={[
+                styles.modalButtonText,
+                !hasEnoughPoints && styles.disabledModalButtonText
+              ]}>
+                Confirm
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 }
 
 export default function WordSprintGame() {
@@ -58,6 +148,10 @@ export default function WordSprintGame() {
   const [revealedLetters, setRevealedLetters] = useState<number[]>([]);
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
   const [currentScrambledWord, setCurrentScrambledWord] = useState('');
+  
+  // Popup states
+  const [showHintPopup, setShowHintPopup] = useState(false);
+  const [showAnswerPopup, setShowAnswerPopup] = useState(false);
 
   const stages: Stage[] = wordsData as Stage[];
   const currentStageData = stages[gameState.currentStage];
@@ -146,6 +240,12 @@ export default function WordSprintGame() {
     } else {
       setMessage('Try again!');
       setGameState(prev => ({ ...prev, streak: 0 }));
+      
+      // Re-scramble the word on wrong answer
+      if (currentLevelData) {
+        setCurrentScrambledWord(scramble(currentLevelData.word));
+        console.log('Wrong answer - re-scrambling word');
+      }
     }
   };
 
@@ -174,12 +274,9 @@ export default function WordSprintGame() {
     });
   };
 
-  const useHint = () => {
-    if (gameState.points < 50) {
-      Alert.alert('Not enough points!', 'You need at least 50 points to use a hint.');
-      return;
-    }
-
+  const handleHintConfirm = () => {
+    setShowHintPopup(false);
+    
     if (!currentLevelData) return;
 
     const word = currentLevelData.word;
@@ -201,14 +298,13 @@ export default function WordSprintGame() {
     setRevealedLetters(prev => [...prev, randomPosition]);
     setGameState(prev => ({ ...prev, points: prev.points - 50 }));
     setMessage('Hint used! One letter revealed.');
+    
+    console.log('Hint used - 50 points deducted');
   };
 
-  const revealAnswer = () => {
-    if (gameState.points < 200) {
-      Alert.alert('Not enough points!', 'You need at least 200 points to reveal the answer.');
-      return;
-    }
-
+  const handleAnswerConfirm = () => {
+    setShowAnswerPopup(false);
+    
     if (!currentLevelData) return;
 
     setIsAnswerRevealed(true);
@@ -222,9 +318,19 @@ export default function WordSprintGame() {
       completedLevels: new Set([...prev.completedLevels, levelKey]),
     }));
 
+    console.log('Answer revealed - 200 points deducted');
+
     setTimeout(() => {
       moveToNextLevel();
     }, 2000);
+  };
+
+  const useHint = () => {
+    setShowHintPopup(true);
+  };
+
+  const revealAnswer = () => {
+    setShowAnswerPopup(true);
   };
 
   const purchaseHints = () => {
@@ -341,7 +447,7 @@ export default function WordSprintGame() {
             onPress={useHint}
             style={[
               styles.hintButton, 
-              (gameState.points < 50 || isAnswerRevealed) && styles.disabledButton
+              isAnswerRevealed && styles.disabledButton
             ]}
           />
           <Button
@@ -349,7 +455,7 @@ export default function WordSprintGame() {
             onPress={revealAnswer}
             style={[
               styles.answerButton, 
-              (gameState.points < 200 || isAnswerRevealed) && styles.disabledButton
+              isAnswerRevealed && styles.disabledButton
             ]}
           />
         </View>
@@ -366,6 +472,25 @@ export default function WordSprintGame() {
           style={styles.backButton}
         />
       </View>
+
+      {/* Confirmation Popups */}
+      <ConfirmationPopup
+        visible={showHintPopup}
+        title="Use Hint"
+        cost={50}
+        currentPoints={gameState.points}
+        onConfirm={handleHintConfirm}
+        onCancel={() => setShowHintPopup(false)}
+      />
+
+      <ConfirmationPopup
+        visible={showAnswerPopup}
+        title="Reveal Answer"
+        cost={200}
+        currentPoints={gameState.points}
+        onConfirm={handleAnswerConfirm}
+        onCancel={() => setShowAnswerPopup(false)}
+      />
     </ScrollView>
   );
 }
@@ -518,5 +643,79 @@ const styles = StyleSheet.create({
     color: colors.accent,
     textAlign: 'center',
     marginBottom: 30,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: colors.background,
+    borderRadius: 16,
+    padding: 24,
+    margin: 20,
+    minWidth: 280,
+    maxWidth: 320,
+    alignItems: 'center',
+    boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.2)',
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalCost: {
+    fontSize: 18,
+    color: colors.accent,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  modalPoints: {
+    fontSize: 16,
+    color: colors.text,
+    marginBottom: 16,
+  },
+  modalWarning: {
+    fontSize: 14,
+    color: colors.error || '#ff4444',
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: colors.grey,
+  },
+  confirmButton: {
+    backgroundColor: colors.primary,
+  },
+  disabledModalButton: {
+    backgroundColor: colors.grey,
+    opacity: 0.5,
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  disabledModalButtonText: {
+    color: colors.text,
   },
 });
