@@ -3,7 +3,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { 
   View, 
   Text, 
-  TextInput, 
   Alert, 
   StyleSheet, 
   Modal, 
@@ -46,6 +45,12 @@ interface GameProgress {
   points: number;
 }
 
+interface LetterTile {
+  letter: string;
+  index: number;
+  disabled: boolean;
+}
+
 // Enhanced scramble function that ensures the result is always different from the original
 const scramble = (word: string): string => {
   if (word.length <= 1) return word;
@@ -74,6 +79,41 @@ const scramble = (word: string): string => {
   
   console.log(`Scrambled "${word}" to "${scrambledWord}"`);
   return scrambledWord;
+};
+
+// Generate letter pool for tap-letter system
+const generateLetterPool = (word: string): LetterTile[] => {
+  const wordLetters = word.toLowerCase().split('');
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+  const pool: string[] = [...wordLetters];
+  
+  // Count existing letters to avoid too many duplicates
+  const letterCounts: { [key: string]: number } = {};
+  wordLetters.forEach(letter => {
+    letterCounts[letter] = (letterCounts[letter] || 0) + 1;
+  });
+  
+  // Add random letters until we have at least 10 (or more if word is longer)
+  const targetSize = Math.max(10, word.length + 3);
+  while (pool.length < targetSize) {
+    const randomLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
+    const currentCount = letterCounts[randomLetter] || 0;
+    
+    // Limit each letter to max 2 total occurrences unless it's in the word more than that
+    const maxAllowed = Math.max(2, wordLetters.filter(l => l === randomLetter).length);
+    if (currentCount < maxAllowed) {
+      pool.push(randomLetter);
+      letterCounts[randomLetter] = currentCount + 1;
+    }
+  }
+  
+  // Shuffle the pool and create tiles with indices
+  const shuffledPool = pool.sort(() => Math.random() - 0.5);
+  return shuffledPool.map((letter, index) => ({
+    letter: letter.toUpperCase(),
+    index,
+    disabled: false
+  }));
 };
 
 // Sound effect placeholders
@@ -150,7 +190,12 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
   const [streak, setStreak] = useState(0);
   const [word, setWord] = useState('loading');
   const [scrambled, setScrambled] = useState('loading');
-  const [input, setInput] = useState("");
+  
+  // Tap-letter system state
+  const [currentGuess, setCurrentGuess] = useState<string[]>([]);
+  const [letterTiles, setLetterTiles] = useState<LetterTile[]>([]);
+  const [guessHistory, setGuessHistory] = useState<number[]>([]); // Track tile indices used
+  
   const [showBanner, setShowBanner] = useState(false);
   const [bannerText, setBannerText] = useState("");
   const [showStageComplete, setShowStageComplete] = useState(false);
@@ -187,6 +232,9 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
   const pressScaleSubmit = useRef(new Animated.Value(1)).current;
   const pressScaleHint = useRef(new Animated.Value(1)).current;
   const pressScaleAnswer = useRef(new Animated.Value(1)).current;
+  const pressScaleBackspace = useRef(new Animated.Value(1)).current;
+  const pressScaleClear = useRef(new Animated.Value(1)).current;
+  const pressScaleShuffle = useRef(new Animated.Value(1)).current;
   const fadeOpacity = useRef(new Animated.Value(1)).current;
 
   // Load settings, word sets cache, and game progress
@@ -201,6 +249,17 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
       loadProgress();
     }
   }, [cacheLoaded]);
+
+  // Initialize letter pool when word changes
+  useEffect(() => {
+    if (word && word !== 'loading') {
+      const tiles = generateLetterPool(word);
+      setLetterTiles(tiles);
+      setCurrentGuess([]);
+      setGuessHistory([]);
+      console.log('Generated letter pool for word:', word, tiles.map(t => t.letter).join(''));
+    }
+  }, [word]);
 
   const loadSettings = async () => {
     try {
@@ -303,6 +362,91 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     }
   };
 
+  // Tap-letter system functions
+  const handleLetterTap = (tileIndex: number) => {
+    const tile = letterTiles[tileIndex];
+    if (tile.disabled || currentGuess.length >= word.length) return;
+    
+    if (settings.sound) {
+      playClick();
+    }
+    
+    // Add letter to guess
+    setCurrentGuess(prev => [...prev, tile.letter]);
+    setGuessHistory(prev => [...prev, tileIndex]);
+    
+    // Disable the tile
+    setLetterTiles(prev => prev.map((t, i) => 
+      i === tileIndex ? { ...t, disabled: true } : t
+    ));
+    
+    console.log('Letter tapped:', tile.letter, 'Current guess:', [...currentGuess, tile.letter].join(''));
+  };
+
+  const handleBackspace = () => {
+    if (currentGuess.length === 0) return;
+    
+    if (settings.sound) {
+      playClick();
+    }
+    
+    // Remove last letter and re-enable its tile
+    const lastTileIndex = guessHistory[guessHistory.length - 1];
+    setCurrentGuess(prev => prev.slice(0, -1));
+    setGuessHistory(prev => prev.slice(0, -1));
+    
+    setLetterTiles(prev => prev.map((t, i) => 
+      i === lastTileIndex ? { ...t, disabled: false } : t
+    ));
+    
+    console.log('Backspace - removed letter, current guess:', currentGuess.slice(0, -1).join(''));
+  };
+
+  const handleClear = () => {
+    if (currentGuess.length === 0) return;
+    
+    if (settings.sound) {
+      playClick();
+    }
+    
+    // Clear all and re-enable all tiles
+    setCurrentGuess([]);
+    setGuessHistory([]);
+    setLetterTiles(prev => prev.map(t => ({ ...t, disabled: false })));
+    
+    console.log('Cleared guess');
+  };
+
+  const handleShuffle = () => {
+    if (settings.sound) {
+      playClick();
+    }
+    
+    // Shuffle only the unused tiles
+    setLetterTiles(prev => {
+      const enabledTiles = prev.filter(t => !t.disabled);
+      const disabledTiles = prev.filter(t => t.disabled);
+      
+      // Shuffle enabled tiles
+      const shuffledEnabled = enabledTiles.sort(() => Math.random() - 0.5);
+      
+      // Reconstruct the array maintaining disabled positions
+      const result = [...prev];
+      let enabledIndex = 0;
+      
+      for (let i = 0; i < result.length; i++) {
+        if (!result[i].disabled) {
+          result[i] = { ...shuffledEnabled[enabledIndex], index: i };
+          enabledIndex++;
+        }
+      }
+      
+      return result;
+    });
+    
+    console.log('Shuffled unused tiles');
+  };
+
   const animateCorrect = () => {
     if (settings.reduceMotion) return;
     
@@ -387,7 +531,6 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     setLevel(l);
     setWord(w);
     setScrambled(scramble(w));
-    setInput("");
     save(s, l, points);
     animateStageTransition();
     console.log(`Moved to stage ${s + 1}, level ${l + 1}: ${w}`);
@@ -409,7 +552,6 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     setLevel(l);
     setWord(w);
     setScrambled(scramble(w));
-    setInput("");
     setShowStageComplete(false);
     save(s, l, points);
     animateStageTransition();
@@ -421,7 +563,10 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
       playClick();
     }
 
-    if (input.toLowerCase() === word.toLowerCase()) {
+    const guess = currentGuess.join('').toLowerCase();
+    const targetWord = word.toLowerCase();
+
+    if (guess === targetWord) {
       let gain = 10 * (stage + 1);
       const ns = streak + 1;
       if (ns % 3 === 0) gain += 5;
@@ -437,7 +582,7 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
         gain,
         streak: ns,
         theme: currentThemes[stage],
-        word: word.toLowerCase()
+        word: targetWord
       });
       
       if (settings.sound) {
@@ -460,13 +605,22 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
         stage: stage + 1,
         level: level + 1,
         theme: currentThemes[stage],
-        word: word.toLowerCase(),
-        guess: input.toLowerCase()
+        word: targetWord,
+        guess: guess
       });
       
       animateWrong();
-      setScrambled(scramble(word)); // Re-scramble on wrong answer
-      console.log('Wrong answer - re-scrambling word');
+      
+      // Re-scramble tiles on wrong answer
+      if (!settings.reduceMotion) {
+        handleShuffle();
+        // Auto-clear guess if reduce motion is off
+        setTimeout(() => {
+          handleClear();
+        }, 300);
+      }
+      
+      console.log('Wrong answer - re-scrambling tiles');
       
       // Show alert with feedback option for wrong answers
       Alert.alert(
@@ -481,7 +635,7 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
               const currentThemes = wordSetsCache.themes.length > 0 ? wordSetsCache.themes : themes;
               setFeedbackContext({
                 category: 'Bug',
-                message: `Context: Wrong answer on "${word}" (Stage ${stage + 1}, Level ${level + 1}, Theme: ${currentThemes[stage]}). My guess was "${input}". `
+                message: `Context: Wrong answer on "${word}" (Stage ${stage + 1}, Level ${level + 1}, Theme: ${currentThemes[stage]}). My guess was "${guess}". `
               });
               setShowFeedback(true);
             }
@@ -508,8 +662,27 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
         word: word.toLowerCase()
       });
       
-      Alert.alert("Hint", `First letter: ${word[0]}`);
-      console.log('Hint used - 50 points deducted');
+      // Auto-place the next correct letter
+      const targetWord = word.toLowerCase();
+      const nextPosition = currentGuess.length;
+      
+      if (nextPosition < targetWord.length) {
+        const nextLetter = targetWord[nextPosition].toUpperCase();
+        
+        // Find the first available tile with this letter
+        const availableTileIndex = letterTiles.findIndex(tile => 
+          tile.letter === nextLetter && !tile.disabled
+        );
+        
+        if (availableTileIndex !== -1) {
+          // Auto-tap this tile
+          handleLetterTap(availableTileIndex);
+          console.log('Hint used - auto-placed letter:', nextLetter);
+        } else {
+          Alert.alert("Hint", `Next letter: ${nextLetter}`);
+        }
+      }
+      
     } catch (error) {
       console.error('Error deducting points for hint:', error);
       Alert.alert('Error', 'Failed to use hint. Please try again.');
@@ -533,11 +706,35 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
         word: word.toLowerCase()
       });
       
-      Alert.alert("Answer", word);
-      console.log('Answer revealed - 200 points deducted');
+      // Fill all remaining letters instantly
+      const targetWord = word.toLowerCase();
+      const remainingLetters = targetWord.slice(currentGuess.length);
+      
+      for (const letter of remainingLetters) {
+        const availableTileIndex = letterTiles.findIndex(tile => 
+          tile.letter === letter.toUpperCase() && !tile.disabled
+        );
+        
+        if (availableTileIndex !== -1) {
+          // Add to guess without animation
+          setCurrentGuess(prev => [...prev, letter.toUpperCase()]);
+          setGuessHistory(prev => [...prev, availableTileIndex]);
+          setLetterTiles(prev => prev.map((t, i) => 
+            i === availableTileIndex ? { ...t, disabled: true } : t
+          ));
+        }
+      }
+      
+      console.log('Answer revealed - auto-filled word');
+      
+      // Show success and move to next
       setTimeout(() => {
-        next();
-      }, 1000);
+        showSuccessBanner("Answer revealed!");
+        setTimeout(() => {
+          next();
+        }, 800);
+      }, 500);
+      
     } catch (error) {
       console.error('Error deducting points for answer:', error);
       Alert.alert('Error', 'Failed to reveal answer. Please try again.');
@@ -651,12 +848,16 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
         submit: '#00FF00',
         hint: '#FFD700',
         answer: '#FF5555',
+        letterTile: '#00FF00',
+        letterTileDisabled: '#333333',
       };
     }
     return {
       submit: '#00e676',
       hint: '#ffd54f',
       answer: '#ff8a80',
+      letterTile: '#2E3A59',
+      letterTileDisabled: '#1F2943',
     };
   };
 
@@ -682,6 +883,81 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
         <View style={styles.progressBar}>
           {segments}
         </View>
+      </View>
+    );
+  };
+
+  // Render current guess boxes
+  const renderGuessBoxes = () => {
+    const boxes = Array.from({ length: word.length }, (_, i) => {
+      const hasLetter = i < currentGuess.length;
+      const letter = hasLetter ? currentGuess[i] : '';
+      
+      return (
+        <View
+          key={i}
+          style={[
+            styles.guessBox,
+            hasLetter && styles.guessBoxFilled,
+            settings.highContrast && styles.guessBoxHighContrast,
+            settings.highContrast && hasLetter && styles.guessBoxFilledHighContrast
+          ]}
+        >
+          <Text style={[
+            styles.guessBoxText,
+            settings.highContrast && styles.guessBoxTextHighContrast
+          ]}>
+            {letter || '_'}
+          </Text>
+        </View>
+      );
+    });
+    
+    return (
+      <View style={styles.guessContainer}>
+        {boxes}
+      </View>
+    );
+  };
+
+  // Render letter tiles grid
+  const renderLetterTiles = () => {
+    const tilesPerRow = 5;
+    const rows = [];
+    
+    for (let i = 0; i < letterTiles.length; i += tilesPerRow) {
+      const rowTiles = letterTiles.slice(i, i + tilesPerRow);
+      rows.push(
+        <View key={i} style={styles.letterRow}>
+          {rowTiles.map((tile, index) => (
+            <Pressable
+              key={tile.index}
+              style={[
+                styles.letterTile,
+                tile.disabled && styles.letterTileDisabled,
+                settings.highContrast && !tile.disabled && styles.letterTileHighContrast,
+                settings.highContrast && tile.disabled && styles.letterTileDisabledHighContrast
+              ]}
+              onPress={() => handleLetterTap(tile.index)}
+              disabled={tile.disabled}
+              {...createPressHandlers(new Animated.Value(1))}
+            >
+              <Text style={[
+                styles.letterTileText,
+                tile.disabled && styles.letterTileTextDisabled,
+                settings.highContrast && styles.letterTileTextHighContrast
+              ]}>
+                {tile.letter}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      );
+    }
+    
+    return (
+      <View style={styles.letterGrid}>
+        {rows}
       </View>
     );
   };
@@ -776,7 +1052,7 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
       {renderProgressBar()}
 
       {/* Game Content */}
-      <View style={styles.gameContent}>
+      <ScrollView style={styles.gameContent} contentContainerStyle={styles.gameContentContainer}>
         <Text style={styles.themeText}>Theme: {currentThemes[stage]}</Text>
         
         <Animated.View style={[styles.wordCard, { opacity: fadeOpacity }]}>
@@ -785,21 +1061,48 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
           </Animated.Text>
         </Animated.View>
         
-        <TextInput
-          style={[
-            styles.input,
-            settings.highContrast && { borderColor: '#ffffff', borderWidth: 2 }
-          ]}
-          value={input}
-          onChangeText={setInput}
-          placeholder="Unscramble…"
-          placeholderTextColor="rgba(255,255,255,0.6)"
-          autoFocus={true}
-          autoCapitalize="none"
-          returnKeyType="done"
-          onSubmitEditing={check}
-        />
+        {/* Current Guess Display */}
+        {renderGuessBoxes()}
         
+        {/* Letter Tiles Grid */}
+        {renderLetterTiles()}
+        
+        {/* Control Buttons */}
+        <View style={styles.controlButtonsContainer}>
+          <View style={styles.controlButtonsRow}>
+            <Pressable
+              style={[styles.controlButton, styles.backspaceButton]}
+              onPress={handleBackspace}
+              {...createPressHandlers(pressScaleBackspace)}
+            >
+              <Animated.View style={{ transform: [{ scale: pressScaleBackspace }] }}>
+                <Text style={styles.controlButtonText}>⌫</Text>
+              </Animated.View>
+            </Pressable>
+            
+            <Pressable
+              style={[styles.controlButton, styles.clearButton]}
+              onPress={handleClear}
+              {...createPressHandlers(pressScaleClear)}
+            >
+              <Animated.View style={{ transform: [{ scale: pressScaleClear }] }}>
+                <Text style={styles.controlButtonText}>Clear</Text>
+              </Animated.View>
+            </Pressable>
+            
+            <Pressable
+              style={[styles.controlButton, styles.shuffleButton]}
+              onPress={handleShuffle}
+              {...createPressHandlers(pressScaleShuffle)}
+            >
+              <Animated.View style={{ transform: [{ scale: pressScaleShuffle }] }}>
+                <Text style={styles.controlButtonText}>🔀</Text>
+              </Animated.View>
+            </Pressable>
+          </View>
+        </View>
+        
+        {/* Game Action Buttons */}
         <View style={styles.buttonContainer}>
           <Pressable
             style={[styles.gameButton, { backgroundColor: buttonColors.submit }]}
@@ -820,7 +1123,7 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
           >
             <Animated.View style={{ transform: [{ scale: pressScaleHint }] }}>
               <Text style={[styles.gameButtonText, settings.highContrast && { color: '#ffffff' }]}>
-                Hint (50 pts)
+                {points >= 50 ? 'Hint (50 pts)' : 'Need 50 pts'}
               </Text>
             </Animated.View>
           </Pressable>
@@ -832,12 +1135,12 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
           >
             <Animated.View style={{ transform: [{ scale: pressScaleAnswer }] }}>
               <Text style={[styles.gameButtonText, settings.highContrast && { color: '#ffffff' }]}>
-                Answer (200 pts)
+                {points >= 200 ? 'Answer (200 pts)' : 'Need 200 pts'}
               </Text>
             </Animated.View>
           </Pressable>
         </View>
-      </View>
+      </ScrollView>
 
       {/* Stage Complete Modal */}
       <Modal
@@ -1066,9 +1369,11 @@ const styles = StyleSheet.create({
   },
   gameContent: {
     flex: 1,
+  },
+  gameContentContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
     paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   themeText: {
     color: 'rgba(255,255,255,0.8)',
@@ -1079,7 +1384,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 16,
     padding: 24,
-    marginBottom: 30,
+    marginBottom: 20,
     minWidth: 200,
     alignItems: 'center',
     shadowColor: '#000',
@@ -1089,22 +1394,134 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   scrambledWord: {
-    fontSize: 42,
+    fontSize: 32,
     fontWeight: '700',
     color: '#ffffff',
     textAlign: 'center',
   },
-  input: {
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 18,
-    textAlign: 'center',
-    width: '100%',
-    maxWidth: 300,
-    marginBottom: 30,
-    color: '#333',
+  // Guess boxes styles
+  guessContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    marginBottom: 20,
+    gap: 8,
   },
+  guessBox: {
+    width: 44,
+    height: 44,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  guessBoxFilled: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderColor: 'rgba(255,255,255,0.6)',
+    boxShadow: '0 0 8px rgba(255,255,255,0.3)',
+  },
+  guessBoxHighContrast: {
+    backgroundColor: '#000000',
+    borderColor: '#ffffff',
+    borderWidth: 2,
+  },
+  guessBoxFilledHighContrast: {
+    backgroundColor: '#000000',
+    borderColor: '#ffffff',
+  },
+  guessBoxText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  guessBoxTextHighContrast: {
+    color: '#ffffff',
+  },
+  // Letter tiles styles
+  letterGrid: {
+    marginBottom: 20,
+    gap: 8,
+  },
+  letterRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  letterTile: {
+    width: 44,
+    height: 44,
+    backgroundColor: '#2E3A59',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 44,
+    minHeight: 44,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  letterTileDisabled: {
+    backgroundColor: '#1F2943',
+    opacity: 0.4,
+  },
+  letterTileHighContrast: {
+    backgroundColor: '#00FF00',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+  letterTileDisabledHighContrast: {
+    backgroundColor: '#333333',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    opacity: 1,
+  },
+  letterTileText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  letterTileTextDisabled: {
+    color: 'rgba(255,255,255,0.5)',
+  },
+  letterTileTextHighContrast: {
+    color: '#000000',
+  },
+  // Control buttons styles
+  controlButtonsContainer: {
+    marginBottom: 20,
+  },
+  controlButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  controlButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  backspaceButton: {
+    backgroundColor: 'rgba(255,193,7,0.8)',
+  },
+  clearButton: {
+    backgroundColor: 'rgba(244,67,54,0.8)',
+  },
+  shuffleButton: {
+    backgroundColor: 'rgba(156,39,176,0.8)',
+  },
+  controlButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  // Game action buttons
   buttonContainer: {
     width: '100%',
     maxWidth: 300,
