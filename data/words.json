@@ -2,23 +2,23 @@
 [
   {
     "stage": 1,
-    "theme": "Animals",
+    "theme": "Shapes",
     "levels": [
-      {"word": "cat"},
-      {"word": "dog"},
-      {"word": "bird"},
-      {"word": "fish"},
-      {"word": "bear"},
-      {"word": "wolf"},
-      {"word": "lion"},
-      {"word": "tiger"},
-      {"word": "horse"},
-      {"word": "sheep"},
-      {"word": "rabbit"},
-      {"word": "monkey"},
-      {"word": "elephant"},
-      {"word": "giraffe"},
-      {"word": "kangaroo"}
+      {"word": "circle"},
+      {"word": "square"},
+      {"word": "triangle"},
+      {"word": "rectangle"},
+      {"word": "oval"},
+      {"word": "hexagon"},
+      {"word": "pentagon"},
+      {"word": "cube"},
+      {"word": "sphere"},
+      {"word": "cone"},
+      {"word": "cylinder"},
+      {"word": "star"},
+      {"word": "diamond"},
+      {"word": "heart"},
+      {"word": "arrow"}
     ]
   },
   {
