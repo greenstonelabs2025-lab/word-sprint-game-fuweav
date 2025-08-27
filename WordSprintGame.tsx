@@ -25,8 +25,10 @@ import { colors } from "./styles/commonStyles";
 import { track } from "./src/analytics/AnalyticsService";
 import { getCache, isCacheEmpty, syncWordSets } from "./src/levelsync/SyncService";
 
-// Debug log to verify themes are loaded correctly
+// Debug log to verify themes are loaded correctly from wordBank
 console.log("THEMES_0=", themes[0]);
+console.log("WordBank themes count:", themes.length);
+console.log("First theme words:", wordBank[themes[0]]?.slice(0, 3));
 
 interface ConfirmationPopupProps {
   visible: boolean;
@@ -319,9 +321,13 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
 
   const loadProgress = async () => {
     try {
-      // Clear stale data on next launch (one-time cache clear)
-      await AsyncStorage.removeItem("progress");
-      console.log('Cleared stale progress data');
+      // Clear progress once to ensure clean transition to wordBank
+      const clearedFlag = await AsyncStorage.getItem('progress_cleared_for_wordbank');
+      if (!clearedFlag) {
+        await AsyncStorage.removeItem('progress');
+        await AsyncStorage.setItem('progress_cleared_for_wordbank', 'true');
+        console.log('Progress cleared once for wordBank transition');
+      }
       
       const d = await AsyncStorage.getItem("progress");
       let stored = { stage: 0, level: 0, points: 100 };
