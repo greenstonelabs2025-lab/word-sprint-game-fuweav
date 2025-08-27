@@ -23,7 +23,13 @@
       "extends": "production",
       "android": {
         "buildType": "aab",
-        "gradleCommand": ":app:bundleRelease"
+        "gradleCommand": ":app:bundleRelease",
+        "cache": {
+          "disabled": true
+        }
+      },
+      "env": {
+        "EXPO_NO_CACHE": "1"
       }
     }
   },
