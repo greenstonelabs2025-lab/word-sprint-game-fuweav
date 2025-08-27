@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,10 @@ import {
   Modal,
   TouchableOpacity,
   Pressable,
+  Animated,
+  Easing,
+  Vibration,
+  LayoutAnimation,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, commonStyles } from '../styles/commonStyles';
@@ -181,6 +185,12 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
   const [showHintPopup, setShowHintPopup] = useState(false);
   const [showAnswerPopup, setShowAnswerPopup] = useState(false);
 
+  // Animated values
+  const scaleWord = useRef(new Animated.Value(1)).current;
+  const shake = useRef(new Animated.Value(0)).current;
+  const pressScale = useRef(new Animated.Value(1)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+
   const stages: Stage[] = wordsData as Stage[];
   const currentStageData = stages[gameState.currentStage];
   const currentLevelData = currentStageData?.levels[gameState.currentLevel];
@@ -194,7 +204,7 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
     saveGameState();
   }, [gameState]);
 
-  // Generate new scrambled word when level changes
+  // Generate new scrambled word when level changes and trigger fade-in
   useEffect(() => {
     if (currentLevelData) {
       setCurrentScrambledWord(scramble(currentLevelData.word));
@@ -202,6 +212,16 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
       setIsAnswerRevealed(false);
       setMessage('');
       setUserInput('');
+      
+      // Fade-in animation for stage/level changes
+      cardOpacity.setValue(0);
+      Animated.timing(cardOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+      
+      console.log('Level changed - triggering fade-in animation');
     }
   }, [gameState.currentStage, gameState.currentLevel]);
 
@@ -296,18 +316,58 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
         completedLevels: new Set([...prev.completedLevels, levelKey]),
       }));
 
+      // Correct answer animation
+      Animated.sequence([
+        Animated.timing(scaleWord, {
+          toValue: 1.15,
+          duration: 140,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleWord, {
+          toValue: 1,
+          friction: 4,
+          useNativeDriver: true,
+        })
+      ]).start();
+
+      console.log('Correct answer - playing scale animation');
+
       // Move to next level after a delay
       setTimeout(() => {
+        // Configure layout animation before moving to next level
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         moveToNextLevel();
       }, 1500);
     } else {
       setMessage('Try again!');
       setGameState(prev => ({ ...prev, streak: 0 }));
       
+      // Wrong answer feedback
+      Vibration.vibrate(30);
+      
+      // Shake animation
+      Animated.sequence([
+        Animated.timing(shake, {
+          toValue: 1,
+          duration: 60,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shake, {
+          toValue: -1,
+          duration: 60,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shake, {
+          toValue: 0,
+          duration: 60,
+          useNativeDriver: true,
+        })
+      ]).start();
+      
       // Re-scramble the word on wrong answer
       if (currentLevelData) {
         setCurrentScrambledWord(scramble(currentLevelData.word));
-        console.log('Wrong answer - re-scrambling word');
+        console.log('Wrong answer - vibrating, shaking, and re-scrambling word');
       }
     }
   };
@@ -396,6 +456,22 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
     setShowAnswerPopup(true);
   };
 
+  const handlePressIn = () => {
+    Animated.spring(pressScale, {
+      toValue: 0.96,
+      speed: 20,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(pressScale, {
+      toValue: 1,
+      speed: 20,
+      useNativeDriver: true,
+    }).start();
+  };
+
   const renderScrambledWord = () => {
     if (!currentLevelData || !currentScrambledWord) return null;
 
@@ -470,16 +546,28 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Game Card with Overlay */}
-        <View style={styles.gameCard}>
+        {/* Game Card with Overlay and Fade-in Animation */}
+        <Animated.View style={[styles.gameCard, { opacity: cardOpacity }]}>
           {/* Stage and Level Info */}
           <Text style={styles.stageLabel}>Stage {gameState.currentStage + 1} • {currentStageData.theme}</Text>
           <Text style={styles.levelLabel}>Level {gameState.currentLevel + 1} of 15</Text>
 
-          {/* Scrambled Word Display */}
-          <Text style={styles.scrambledWordTitle}>
-            {currentScrambledWord.toUpperCase()}
-          </Text>
+          {/* Scrambled Word Display with Scale and Shake Animations */}
+          <Animated.View style={{
+            transform: [
+              { scale: scaleWord },
+              { 
+                translateX: shake.interpolate({
+                  inputRange: [-1, 1],
+                  outputRange: [-8, 8]
+                })
+              }
+            ]
+          }}>
+            <Text style={styles.scrambledWordTitle}>
+              {currentScrambledWord.toUpperCase()}
+            </Text>
+          </Animated.View>
 
           {/* User Input */}
           <TextInput
@@ -507,33 +595,45 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
             </Text>
           ) : null}
 
-          {/* Action Buttons */}
+          {/* Action Buttons with Press Feedback */}
           <View style={styles.buttonContainer}>
             <Pressable 
               style={[styles.actionButton, styles.submitButton, isAnswerRevealed && styles.disabledButton]} 
               onPress={checkAnswer}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
               disabled={isAnswerRevealed}
             >
-              <Text style={styles.actionButtonText}>Submit</Text>
+              <Animated.View style={{ transform: [{ scale: pressScale }] }}>
+                <Text style={styles.actionButtonText}>Submit</Text>
+              </Animated.View>
             </Pressable>
 
             <Pressable 
               style={[styles.actionButton, styles.hintButton, isAnswerRevealed && styles.disabledButton]} 
               onPress={useHint}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
               disabled={isAnswerRevealed}
             >
-              <Text style={styles.actionButtonText}>Hint</Text>
+              <Animated.View style={{ transform: [{ scale: pressScale }] }}>
+                <Text style={styles.actionButtonText}>Hint</Text>
+              </Animated.View>
             </Pressable>
 
             <Pressable 
               style={[styles.actionButton, styles.answerButton, isAnswerRevealed && styles.disabledButton]} 
               onPress={revealAnswer}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
               disabled={isAnswerRevealed}
             >
-              <Text style={styles.actionButtonText}>Answer</Text>
+              <Animated.View style={{ transform: [{ scale: pressScale }] }}>
+                <Text style={styles.actionButtonText}>Answer</Text>
+              </Animated.View>
             </Pressable>
           </View>
-        </View>
+        </Animated.View>
       </ScrollView>
 
       {/* Confirmation Popups */}
