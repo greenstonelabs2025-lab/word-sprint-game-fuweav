@@ -801,7 +801,7 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
   // Get theme background color
   const getThemeBackground = () => {
     if (settings.highContrast) {
-      return '#1a1a1a';
+      return '#000000';
     }
     
     const themeColors: { [key: string]: string } = {
@@ -1007,34 +1007,37 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
 
   return (
     <View style={containerStyle}>
-      {/* HUD Bar */}
-      <View style={styles.hudBar}>
+      {/* Fixed HUD Bar */}
+      <View style={[
+        styles.hudContainer,
+        settings.highContrast && styles.hudContainerHighContrast
+      ]}>
+        {/* Left: Home Button */}
         {onExit && (
           <GradientButton
             title="🏠"
             onPress={handleMenuPress}
             colors={['#3A4A6A', '#23314A']}
             size="sm"
-            style={styles.menuButtonPill}
+            style={styles.hudHomeButton}
           />
         )}
         
-        <Text style={styles.gameTitle}>WORD SPRINT</Text>
+        {/* Center: Title */}
+        <Text style={[
+          styles.hudTitle,
+          settings.highContrast && styles.hudTitleHighContrast
+        ]}>
+          Word Sprint
+        </Text>
         
-        <View style={styles.hudRight}>
-          {onStore && (
-            <TouchableOpacity style={styles.storeButton} onPress={handleStorePress}>
-              <Text style={styles.storeButtonText}>Store</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity style={styles.settingsButton} onPress={handleSettingsPress}>
-            <Text style={styles.settingsButtonText}>⚙️</Text>
-          </TouchableOpacity>
-          <View style={styles.pointsPill}>
-            <Text style={styles.pointsText}>{points}</Text>
-            <Text style={styles.streakText}>🔥{streak}</Text>
-          </View>
-        </View>
+        {/* Right: Points */}
+        <Text style={[
+          styles.hudPoints,
+          settings.highContrast && styles.hudPointsHighContrast
+        ]}>
+          Pts: {points}
+        </Text>
       </View>
 
       {/* Success Banner */}
@@ -1245,71 +1248,51 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 50,
   },
-  hudBar: {
+  // Fixed HUD Container
+  hudContainer: {
+    width: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  menuButton: {
+    justifyContent: 'space-between',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 6,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    zIndex: 1000,
   },
-  menuButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
+  hudContainerHighContrast: {
+    backgroundColor: '#000000',
   },
-  gameTitle: {
+  // Left: Home Button
+  hudHomeButton: {
+    width: 50,
+    height: 36,
+  },
+  // Center: Title
+  hudTitle: {
+    flex: 1,
+    textAlign: 'center',
     fontSize: 20,
     fontWeight: 'bold',
     color: '#ffffff',
-    letterSpacing: 2,
+    letterSpacing: 1,
   },
-  hudRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  storeButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: 'rgba(255,111,0,0.8)',
-    borderRadius: 4,
-  },
-  storeButtonText: {
+  hudTitleHighContrast: {
     color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
   },
-  settingsButton: {
-    padding: 6,
-  },
-  settingsButtonText: {
+  // Right: Points
+  hudPoints: {
     fontSize: 18,
+    fontWeight: '600',
     color: '#ffffff',
+    textAlign: 'right',
+    minWidth: 80,
   },
-  pointsPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 8,
-  },
-  pointsText: {
+  hudPointsHighContrast: {
     color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  streakText: {
-    color: '#ffffff',
-    fontSize: 14,
   },
   banner: {
     position: 'absolute',
@@ -1329,6 +1312,7 @@ const styles = StyleSheet.create({
   progressContainer: {
     paddingHorizontal: 20,
     paddingVertical: 16,
+    marginTop: 50, // Account for fixed HUD
   },
   progressLabel: {
     color: 'rgba(255,255,255,0.8)',
@@ -1482,32 +1466,6 @@ const styles = StyleSheet.create({
   controlButtonPill: {
     minWidth: 60,
     maxWidth: 100,
-  },
-  menuButtonPill: {
-    width: 50,
-    height: 36,
-  },
-  controlButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    minWidth: 60,
-    alignItems: 'center',
-  },
-  backspaceButton: {
-    backgroundColor: 'rgba(255,193,7,0.8)',
-  },
-  clearButton: {
-    backgroundColor: 'rgba(244,67,54,0.8)',
-  },
-  shuffleButton: {
-    backgroundColor: 'rgba(156,39,176,0.8)',
-  },
-  controlButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
   },
   // Game action buttons
   buttonContainer: {
