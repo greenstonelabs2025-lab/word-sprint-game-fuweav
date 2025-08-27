@@ -20,7 +20,6 @@ export default function WordSprintGame() {
   const [level, setLevel] = useState(0);
   const [points, setPoints] = useState(0);
   const [streak, setStreak] = useState(0);
-
   const [word, setWord] = useState(wordBank[themes[0]][0]);
   const [scrambled, setScrambled] = useState(scramble(word));
   const [input, setInput] = useState("");
@@ -28,9 +27,7 @@ export default function WordSprintGame() {
   const nextWord = () => {
     let newLevel = level + 1, newStage = stage;
     if (newLevel >= 15) { newStage++; newLevel = 0; }
-    if (newStage >= themes.length) {
-      Alert.alert("Game Over","All stages done!"); return;
-    }
+    if (newStage >= themes.length) { Alert.alert("Game Over","All stages done!"); return; }
     const newWord = wordBank[themes[newStage]][newLevel];
     setStage(newStage); setLevel(newLevel);
     setWord(newWord); setScrambled(scramble(newWord)); setInput("");
@@ -42,12 +39,21 @@ export default function WordSprintGame() {
       const newStreak = streak + 1;
       if (newStreak % 3 === 0) gain += 5;
       setPoints(points + gain); setStreak(newStreak);
-      Alert.alert("Correct", `+${gain} pts`);
-      nextWord();
-    } else {
-      Alert.alert("Wrong","Try again");
-      setStreak(0);
-    }
+      Alert.alert("Correct", `+${gain} pts`); nextWord();
+    } else { Alert.alert("Wrong","Try again"); setStreak(0); }
+  };
+
+  const buyHint = () => {
+    if (points < 50) { Alert.alert("Not enough points! Need 50."); return; }
+    setPoints(points - 50);
+    Alert.alert("Hint", `First letter: ${word[0]}`);
+  };
+
+  const buyAnswer = () => {
+    if (points < 200) { Alert.alert("Not enough points! Need 200."); return; }
+    setPoints(points - 200);
+    Alert.alert("Answer", `The word is ${word}`);
+    nextWord();
   };
 
   return (
@@ -58,6 +64,8 @@ export default function WordSprintGame() {
       <Text style={styles.word}>{scrambled}</Text>
       <TextInput style={styles.input} value={input} onChangeText={setInput} placeholder="Unscramble..."/>
       <Button title="Submit" onPress={checkAnswer}/>
+      <Button title="Hint (50 pts)" onPress={buyHint}/>
+      <Button title="Answer (200 pts)" onPress={buyAnswer}/>
     </View>
   );
 }
