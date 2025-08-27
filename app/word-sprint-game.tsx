@@ -46,6 +46,16 @@ interface ConfirmationPopupProps {
   currentPoints: number;
   onConfirm: () => void;
   onCancel: () => void;
+  isHint?: boolean;
+}
+
+interface StageCompleteModalProps {
+  visible: boolean;
+  stage: number;
+  points: number;
+  streak: number;
+  onNextStage: () => void;
+  onMenu: () => void;
 }
 
 interface WordSprintGameProps {
@@ -112,8 +122,104 @@ function scramble(word: string): string {
   return scrambledWord;
 }
 
-// Confirmation Popup Component
-function ConfirmationPopup({ visible, title, cost, currentPoints, onConfirm, onCancel }: ConfirmationPopupProps) {
+// Progress Bar Component
+function ProgressBar({ currentLevel }: { currentLevel: number }) {
+  return (
+    <View style={styles.progressContainer}>
+      <Text style={styles.progressLabel}>Stage {Math.floor(currentLevel / 15) + 1} • Level {(currentLevel % 15) + 1}/15</Text>
+      <View style={styles.progressBar}>
+        {Array.from({ length: 15 }, (_, index) => (
+          <View
+            key={index}
+            style={[
+              styles.progressSegment,
+              {
+                opacity: index <= (currentLevel % 15) ? 1 : 0.3,
+              }
+            ]}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// Success Banner Component
+function SuccessBanner({ visible, message, themeColor }: { visible: boolean; message: string; themeColor: string }) {
+  const slideAnim = useRef(new Animated.Value(-100)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.sequence([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.delay(500),
+        Animated.timing(slideAnim, {
+          toValue: -100,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible, slideAnim]);
+
+  if (!visible) return null;
+
+  return (
+    <Animated.View 
+      style={[
+        styles.successBanner, 
+        { backgroundColor: themeColor, transform: [{ translateY: slideAnim }] }
+      ]}
+    >
+      <Text style={styles.successBannerText}>{message}</Text>
+    </Animated.View>
+  );
+}
+
+// Stage Complete Modal Component
+function StageCompleteModal({ visible, stage, points, streak, onNextStage, onMenu }: StageCompleteModalProps) {
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={onMenu}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.stageCompleteContent}>
+          <Text style={styles.stageCompleteTitle}>Stage {stage + 1} Clear!</Text>
+          <View style={styles.stageCompleteStats}>
+            <Text style={styles.stageCompleteText}>Total Points: {points}</Text>
+            <Text style={styles.stageCompleteText}>Streak: {streak}</Text>
+          </View>
+          <View style={styles.stageCompleteButtons}>
+            <Pressable 
+              style={[styles.stageCompleteButton, styles.nextStageButton]} 
+              onPress={onNextStage}
+              accessibilityLabel="Continue to next stage"
+            >
+              <Text style={styles.stageCompleteButtonText}>Next Stage</Text>
+            </Pressable>
+            <Pressable 
+              style={[styles.stageCompleteButton, styles.menuButton]} 
+              onPress={onMenu}
+              accessibilityLabel="Return to main menu"
+            >
+              <Text style={styles.stageCompleteButtonText}>Menu</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// Enhanced Confirmation Popup Component
+function ConfirmationPopup({ visible, title, cost, currentPoints, onConfirm, onCancel, isHint = false }: ConfirmationPopupProps) {
   const hasEnoughPoints = currentPoints >= cost;
   
   return (
@@ -125,32 +231,32 @@ function ConfirmationPopup({ visible, title, cost, currentPoints, onConfirm, onC
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>{title}</Text>
-          <Text style={styles.modalCost}>Cost: {cost} points</Text>
-          <Text style={styles.modalPoints}>Your points: {currentPoints}</Text>
+          <Text style={styles.modalTitle}>Spend Points?</Text>
+          <Text style={styles.modalText}>
+            Hint 50 / Answer 200. You have {currentPoints}.
+          </Text>
           
           {!hasEnoughPoints && (
-            <Text style={styles.modalWarning}>Not enough points!</Text>
+            <Text style={styles.modalWarning}>Not enough points</Text>
           )}
           
           <View style={styles.modalButtons}>
-            <TouchableOpacity
+            <Pressable
               style={[styles.modalButton, styles.cancelButton]}
               onPress={onCancel}
+              accessibilityLabel="Cancel action"
             >
               <Text style={styles.modalButtonText}>Cancel</Text>
-            </TouchableOpacity>
+            </Pressable>
             
-            <TouchableOpacity
+            <Pressable
               style={[
                 styles.modalButton, 
                 styles.confirmButton,
                 !hasEnoughPoints && styles.disabledModalButton
               ]}
-              onPress={hasEnoughPoints ? onConfirm : () => {
-                Alert.alert("Not enough points", "You need more points to use this feature.");
-                onCancel();
-              }}
+              onPress={hasEnoughPoints ? onConfirm : onCancel}
+              accessibilityLabel={hasEnoughPoints ? "Confirm purchase" : "Not enough points"}
             >
               <Text style={[
                 styles.modalButtonText,
@@ -158,7 +264,7 @@ function ConfirmationPopup({ visible, title, cost, currentPoints, onConfirm, onC
               ]}>
                 Confirm
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         </View>
       </View>
@@ -184,6 +290,12 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
   // Popup states
   const [showHintPopup, setShowHintPopup] = useState(false);
   const [showAnswerPopup, setShowAnswerPopup] = useState(false);
+  const [showStageComplete, setShowStageComplete] = useState(false);
+  
+  // Banner states
+  const [showBanner, setShowBanner] = useState(false);
+  const [bannerMessage, setBannerMessage] = useState('');
+  const [buttonsDisabled, setButtonsDisabled] = useState(false);
 
   // Animated values
   const scaleWord = useRef(new Animated.Value(1)).current;
@@ -193,8 +305,18 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
 
   const stages: Stage[] = wordsData as Stage[];
   const currentStageData = stages[gameState.currentStage];
-  const currentLevelData = currentStageData?.levels[gameState.currentLevel];
+  
+  // Empty state safety: handle themes with fewer than 15 words
+  const getCurrentLevelData = () => {
+    if (!currentStageData || !currentStageData.levels.length) return null;
+    
+    const levelIndex = gameState.currentLevel % currentStageData.levels.length;
+    return currentStageData.levels[levelIndex];
+  };
+  
+  const currentLevelData = getCurrentLevelData();
   const currentThemeColor = currentStageData ? themeColors[currentStageData.theme] || '#424242' : '#424242';
+  const isDemoWordSet = currentStageData && currentStageData.levels.length < 15;
 
   useEffect(() => {
     loadGameState();
@@ -287,7 +409,7 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
   };
 
   const checkAnswer = () => {
-    if (!currentLevelData) return;
+    if (!currentLevelData || buttonsDisabled) return;
 
     const userAnswer = userInput.toLowerCase().trim();
     const correctAnswer = currentLevelData.word.toLowerCase();
@@ -305,8 +427,11 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
       
       const totalPoints = basePoints * stageMultiplier + streakBonus;
 
-      setMessage(`Correct! +${totalPoints} points${streakBonus > 0 ? ` (${streakBonus} streak bonus!)` : ''}`);
-      
+      // Show success banner
+      setBannerMessage(`Correct! +${totalPoints} pts`);
+      setShowBanner(true);
+      setButtonsDisabled(true);
+
       const levelKey = `${gameState.currentStage}-${gameState.currentLevel}`;
       
       setGameState(prev => ({
@@ -332,12 +457,20 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
 
       console.log('Correct answer - playing scale animation');
 
-      // Move to next level after a delay
+      // Hide banner and move to next level after delay
       setTimeout(() => {
-        // Configure layout animation before moving to next level
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        moveToNextLevel();
-      }, 1500);
+        setShowBanner(false);
+        setButtonsDisabled(false);
+        
+        // Check if completing level 15 (index 14)
+        if (gameState.currentLevel === 14) {
+          setShowStageComplete(true);
+        } else {
+          // Configure layout animation before moving to next level
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          moveToNextLevel();
+        }
+      }, 800);
     } else {
       setMessage('Try again!');
       setGameState(prev => ({ ...prev, streak: 0 }));
@@ -397,6 +530,23 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
     });
   };
 
+  const handleStageCompleteNextStage = async () => {
+    await saveGameState();
+    setShowStageComplete(false);
+    
+    setGameState(prev => ({
+      ...prev,
+      currentStage: prev.currentStage + 1,
+      currentLevel: 0
+    }));
+  };
+
+  const handleStageCompleteMenu = async () => {
+    await saveGameState();
+    setShowStageComplete(false);
+    onExit?.();
+  };
+
   const handleHintConfirm = () => {
     setShowHintPopup(false);
     
@@ -449,10 +599,12 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
   };
 
   const useHint = () => {
+    if (buttonsDisabled) return;
     setShowHintPopup(true);
   };
 
   const revealAnswer = () => {
+    if (buttonsDisabled) return;
     setShowAnswerPopup(true);
   };
 
@@ -509,7 +661,11 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
             Final Score: {gameState.points} points
           </Text>
           {onExit && (
-            <Pressable style={[styles.actionButton, styles.submitButton]} onPress={onExit}>
+            <Pressable 
+              style={[styles.actionButton, styles.submitButton]} 
+              onPress={onExit}
+              accessibilityLabel="Return to main menu"
+            >
               <Text style={styles.actionButtonText}>Back to Menu</Text>
             </Pressable>
           )}
@@ -520,12 +676,23 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
 
   return (
     <View style={[styles.container, { backgroundColor: currentThemeColor }]}>
+      {/* Success Banner */}
+      <SuccessBanner 
+        visible={showBanner} 
+        message={bannerMessage} 
+        themeColor={currentThemeColor} 
+      />
+
       {/* Top HUD Bar */}
       <View style={styles.hudBar}>
         {/* Left: Menu Button */}
         <View style={styles.hudLeft}>
           {onExit && (
-            <Pressable style={styles.menuButton} onPress={handleMenuPress}>
+            <Pressable 
+              style={styles.menuButton} 
+              onPress={handleMenuPress}
+              accessibilityLabel="Return to main menu"
+            >
               <Text style={styles.menuButtonText}>Menu</Text>
             </Pressable>
           )}
@@ -546,11 +713,19 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* Progress Bar */}
+        <ProgressBar currentLevel={gameState.currentStage * 15 + gameState.currentLevel} />
+
         {/* Game Card with Overlay and Fade-in Animation */}
         <Animated.View style={[styles.gameCard, { opacity: cardOpacity }]}>
           {/* Stage and Level Info */}
           <Text style={styles.stageLabel}>Stage {gameState.currentStage + 1} • {currentStageData.theme}</Text>
           <Text style={styles.levelLabel}>Level {gameState.currentLevel + 1} of 15</Text>
+
+          {/* Demo word set caption */}
+          {isDemoWordSet && (
+            <Text style={styles.demoCaption}>Demo word set</Text>
+          )}
 
           {/* Scrambled Word Display with Scale and Shake Animations */}
           <Animated.View style={{
@@ -581,7 +756,8 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
             autoFocus={true}
             returnKeyType="done"
             onSubmitEditing={checkAnswer}
-            editable={!isAnswerRevealed}
+            editable={!isAnswerRevealed && !buttonsDisabled}
+            accessibilityLabel="Enter your answer here"
           />
 
           {/* Message Display */}
@@ -598,11 +774,16 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
           {/* Action Buttons with Press Feedback */}
           <View style={styles.buttonContainer}>
             <Pressable 
-              style={[styles.actionButton, styles.submitButton, isAnswerRevealed && styles.disabledButton]} 
+              style={[
+                styles.actionButton, 
+                styles.submitButton, 
+                (isAnswerRevealed || buttonsDisabled) && styles.disabledButton
+              ]} 
               onPress={checkAnswer}
               onPressIn={handlePressIn}
               onPressOut={handlePressOut}
-              disabled={isAnswerRevealed}
+              disabled={isAnswerRevealed || buttonsDisabled}
+              accessibilityLabel="Submit answer"
             >
               <Animated.View style={{ transform: [{ scale: pressScale }] }}>
                 <Text style={styles.actionButtonText}>Submit</Text>
@@ -610,11 +791,16 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
             </Pressable>
 
             <Pressable 
-              style={[styles.actionButton, styles.hintButton, isAnswerRevealed && styles.disabledButton]} 
+              style={[
+                styles.actionButton, 
+                styles.hintButton, 
+                (isAnswerRevealed || buttonsDisabled) && styles.disabledButton
+              ]} 
               onPress={useHint}
               onPressIn={handlePressIn}
               onPressOut={handlePressOut}
-              disabled={isAnswerRevealed}
+              disabled={isAnswerRevealed || buttonsDisabled}
+              accessibilityLabel="Buy hint"
             >
               <Animated.View style={{ transform: [{ scale: pressScale }] }}>
                 <Text style={styles.actionButtonText}>Hint</Text>
@@ -622,11 +808,16 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
             </Pressable>
 
             <Pressable 
-              style={[styles.actionButton, styles.answerButton, isAnswerRevealed && styles.disabledButton]} 
+              style={[
+                styles.actionButton, 
+                styles.answerButton, 
+                (isAnswerRevealed || buttonsDisabled) && styles.disabledButton
+              ]} 
               onPress={revealAnswer}
               onPressIn={handlePressIn}
               onPressOut={handlePressOut}
-              disabled={isAnswerRevealed}
+              disabled={isAnswerRevealed || buttonsDisabled}
+              accessibilityLabel="Reveal answer"
             >
               <Animated.View style={{ transform: [{ scale: pressScale }] }}>
                 <Text style={styles.actionButtonText}>Answer</Text>
@@ -644,6 +835,7 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
         currentPoints={gameState.points}
         onConfirm={handleHintConfirm}
         onCancel={() => setShowHintPopup(false)}
+        isHint={true}
       />
 
       <ConfirmationPopup
@@ -653,6 +845,17 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
         currentPoints={gameState.points}
         onConfirm={handleAnswerConfirm}
         onCancel={() => setShowAnswerPopup(false)}
+        isHint={false}
+      />
+
+      {/* Stage Complete Modal */}
+      <StageCompleteModal
+        visible={showStageComplete}
+        stage={gameState.currentStage}
+        points={gameState.points}
+        streak={gameState.streak}
+        onNextStage={handleStageCompleteNextStage}
+        onMenu={handleStageCompleteMenu}
       />
     </View>
   );
@@ -669,6 +872,61 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: 16,
     paddingTop: 8,
+  },
+  
+  // Success Banner Styles
+  successBanner: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 90 : 60,
+    left: 16,
+    right: 16,
+    zIndex: 1000,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  successBannerText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+
+  // Progress Bar Styles
+  progressContainer: {
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  progressLabel: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  progressBar: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  progressSegment: {
+    width: 16,
+    height: 8,
+    backgroundColor: 'white',
+    borderRadius: 4,
+  },
+
+  // Demo Caption Styles
+  demoCaption: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+    marginBottom: 8,
+    fontStyle: 'italic',
   },
   
   // HUD Bar Styles
@@ -706,7 +964,7 @@ const styles = StyleSheet.create({
   },
   menuButtonText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
   },
   pointsPill: {
@@ -743,7 +1001,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   levelLabel: {
-    fontSize: 14,
+    fontSize: 16,
     color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
     marginBottom: 24,
@@ -894,19 +1152,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
-  modalCost: {
-    fontSize: 18,
-    color: '#2196F3',
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  modalPoints: {
+  modalText: {
     fontSize: 16,
     color: '#000',
     marginBottom: 16,
+    textAlign: 'center',
   },
   modalWarning: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#f44336',
     fontWeight: 'bold',
     marginBottom: 16,
@@ -942,5 +1195,56 @@ const styles = StyleSheet.create({
   },
   disabledModalButtonText: {
     color: '#666',
+  },
+
+  // Stage Complete Modal Styles
+  stageCompleteContent: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 32,
+    margin: 20,
+    minWidth: 300,
+    maxWidth: 350,
+    alignItems: 'center',
+    boxShadow: '0px 8px 16px rgba(0, 0, 0, 0.3)',
+    elevation: 8,
+  },
+  stageCompleteTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#000',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  stageCompleteStats: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  stageCompleteText: {
+    fontSize: 18,
+    color: '#000',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  stageCompleteButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 16,
+  },
+  stageCompleteButton: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  nextStageButton: {
+    backgroundColor: '#4CAF50',
+  },
+  stageCompleteButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: 'white',
   },
 });
