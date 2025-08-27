@@ -1,4 +1,13 @@
-import { Text, TouchableOpacity, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+
+import React, { useRef } from 'react';
+import { 
+  Text, 
+  TouchableOpacity, 
+  StyleSheet, 
+  ViewStyle, 
+  TextStyle, 
+  Animated 
+} from 'react-native';
 import { colors } from '../styles/commonStyles';
 
 interface ButtonProps {
@@ -6,13 +15,43 @@ interface ButtonProps {
   onPress: () => void;
   style?: ViewStyle | ViewStyle[];
   textStyle?: TextStyle;
+  disabled?: boolean;
 }
 
-export default function Button({ text, onPress, style, textStyle }: ButtonProps) {
+export default function Button({ text, onPress, style, textStyle, disabled = false }: ButtonProps) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.timing(scaleAnim, {
+      toValue: 0.97,
+      duration: 100,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.timing(scaleAnim, {
+      toValue: 1,
+      duration: 100,
+      useNativeDriver: true,
+    }).start();
+  };
+
   return (
-    <TouchableOpacity style={[styles.button, style]} onPress={onPress} activeOpacity={0.7}>
-      <Text style={[styles.buttonText, textStyle]}>{text}</Text>
-    </TouchableOpacity>
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      <TouchableOpacity 
+        style={[styles.button, style, disabled && styles.disabledButton]} 
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={0.8}
+        disabled={disabled}
+      >
+        <Text style={[styles.buttonText, textStyle, disabled && styles.disabledButtonText]}>
+          {text}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -33,5 +72,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  disabledButton: {
+    backgroundColor: colors.grey,
+    opacity: 0.6,
+  },
+  disabledButtonText: {
+    color: 'rgba(255,255,255,0.7)',
   },
 });
