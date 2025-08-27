@@ -1,20 +1,21 @@
+
 {
   "expo": {
-    "name": "Natively",
-    "slug": "Natively",
-    "version": "1.0.0",
+    "name": "Word Sprint",
+    "slug": "word-sprint",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/natively-dark.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/natively-dark.png",
       "resizeMode": "contain",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.Natively",
+      "bundleIdentifier": "com.wordsprint.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -22,10 +23,11 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/natively-dark.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.Natively"
+      "package": "com.wordsprint.app",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/images/final_quest_240x240.png",
@@ -35,7 +37,7 @@
       "expo-font",
       "expo-router"
     ],
-    "scheme": "natively",
+    "scheme": "wordsprint",
     "experiments": {
       "typedRoutes": true
     },
