@@ -1,28 +1,9 @@
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import MainScreen from './app/index';
 
 export default function App() {
-  console.log('Word Sprint - Build 0.1 splash screen loaded');
+  console.log('Word Sprint app starting directly in main menu');
   
-  return (
-    <View style={styles.container}>
-      <Text style={styles.text}>Word Sprint - Build 0.1</Text>
-    </View>
-  );
+  return <MainScreen />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  text: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000000',
-    textAlign: 'center',
-  },
-});
