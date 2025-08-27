@@ -47,6 +47,7 @@
     "react-native": "0.79.2",
     "react-native-css-interop": "^0.1.22",
     "react-native-gesture-handler": "^2.24.0",
+    "react-native-iap": "^13.0.4",
     "react-native-maps": "^1.20.1",
     "react-native-reanimated": "~3.17.5",
     "react-native-safe-area-context": "^5.4.0",

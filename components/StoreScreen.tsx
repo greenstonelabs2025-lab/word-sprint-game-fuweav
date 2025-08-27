@@ -1,28 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-
-// Centralized points update function
-export const updatePoints = async (delta: number): Promise<number> => {
-  try {
-    const progressData = await AsyncStorage.getItem('progress');
-    let currentProgress = { stage: 0, level: 0, points: 0 };
-    
-    if (progressData) {
-      currentProgress = JSON.parse(progressData);
-    }
-    
-    const newPoints = Math.max(0, Math.min(999999, (currentProgress.points || 0) + delta));
-    currentProgress.points = newPoints;
-    
-    await AsyncStorage.setItem('progress', JSON.stringify(currentProgress));
-    console.log(`Points updated by ${delta}, new total: ${newPoints}`);
-    
-    return newPoints;
-  } catch (error) {
-    console.error('Error updating points:', error);
-    throw error;
-  }
-};
 import {
   View,
   Text,
@@ -37,6 +14,8 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../styles/commonStyles';
+import * as BillingService from '../billing/BillingService';
+import { updatePoints } from '../utils/pointsManager';
 
 interface StoreScreenProps {
   onExit: () => void;
@@ -61,56 +40,28 @@ interface ConfirmPurchaseModalProps {
 
 const purchaseItems: PurchaseItem[] = [
   {
-    id: 'small',
+    id: 'points_250',
     name: 'Small Pack',
     points: 250,
     price: '$0.99',
-    color: '#9E9E9E', // Grey
+    color: '#9E9E9E',
   },
   {
-    id: 'best',
+    id: 'points_600',
     name: 'Best Value',
     points: 600,
     price: '$1.99',
-    color: '#4CAF50', // Green
+    color: '#4CAF50',
     isBest: true,
   },
   {
-    id: 'mega',
+    id: 'points_1500',
     name: 'Mega Pack',
     points: 1500,
     price: '$4.99',
-    color: '#9C27B0', // Purple
+    color: '#9C27B0',
   },
 ];
-
-// Shared points update helper
-export const updatePoints = async (delta: number): Promise<number> => {
-  try {
-    const progressData = await AsyncStorage.getItem('progress');
-    let currentProgress = { stage: 0, level: 0, points: 0 };
-    
-    if (progressData) {
-      currentProgress = JSON.parse(progressData);
-    }
-    
-    // Clamp points between 0 and 999999
-    const newPoints = Math.max(0, Math.min(999999, (currentProgress.points || 0) + delta));
-    
-    const updatedProgress = {
-      ...currentProgress,
-      points: newPoints,
-    };
-    
-    await AsyncStorage.setItem('progress', JSON.stringify(updatedProgress));
-    console.log(`Points updated: ${currentProgress.points || 0} + ${delta} = ${newPoints}`);
-    
-    return newPoints;
-  } catch (error) {
-    console.error('Error updating points:', error);
-    throw error;
-  }
-};
 
 // Confirmation Modal Component
 function ConfirmPurchaseModal({ visible, item, currentPoints, onConfirm, onCancel }: ConfirmPurchaseModalProps) {
@@ -156,8 +107,10 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
   const { height } = useWindowDimensions();
   const [points, setPoints] = useState(0);
   const [adFreeMode, setAdFreeMode] = useState(false);
+  const [premiumMode, setPremiumMode] = useState(false);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<PurchaseItem | null>(null);
+  const [inFlight, setInFlight] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -172,41 +125,108 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
         setPoints(progress.points || 0);
       }
       
-      // Load ad-free preference
+      // Load preferences
       const adFreeValue = await AsyncStorage.getItem('pref_ad_free');
       setAdFreeMode(adFreeValue === 'true');
       
-      console.log('Store data loaded - Points:', points, 'Ad-free:', adFreeMode);
+      const premiumValue = await AsyncStorage.getItem('pref_premium');
+      setPremiumMode(premiumValue === 'true');
+      
+      console.log('Store data loaded - Points:', points, 'Ad-free:', adFreeMode, 'Premium:', premiumMode);
     } catch (error) {
       console.error('Error loading store data:', error);
     }
   };
 
-  const handlePurchase = (item: PurchaseItem) => {
-    setSelectedItem(item);
-    setShowPurchaseModal(true);
+  const mapBillingError = (error: string): string => {
+    switch (error) {
+      case 'USER_CANCELLED':
+        return 'Purchase cancelled';
+      case 'NETWORK_ERROR':
+      case 'SERVICE_UNAVAILABLE':
+        return 'Network error';
+      case 'ITEM_ALREADY_OWNED':
+        return 'Already owned';
+      default:
+        return 'Purchase failed';
+    }
   };
 
-  const confirmPurchase = async () => {
-    if (!selectedItem) return;
+  const handlePurchase = async (item: PurchaseItem) => {
+    if (inFlight) return;
+    
+    setInFlight(true);
     
     try {
-      const newPoints = await updatePoints(selectedItem.points);
-      setPoints(newPoints);
-      setShowPurchaseModal(false);
-      setSelectedItem(null);
+      await BillingService.initBilling();
       
-      // Show success toast
-      Alert.alert(
-        'Purchase Successful!',
-        `Purchased +${selectedItem.points} points`,
-        [{ text: 'OK' }]
-      );
+      const res = await BillingService.purchase(item.id);
       
-      console.log(`Purchase completed: +${selectedItem.points} points`);
+      if (!res.success) {
+        const errorMessage = mapBillingError(res.error || 'UNKNOWN_ERROR');
+        
+        // Handle special case for already owned items
+        if (res.error === 'ITEM_ALREADY_OWNED') {
+          if (item.id === 'adfree_unlock') {
+            await AsyncStorage.setItem('pref_ad_free', 'true');
+            setAdFreeMode(true);
+          } else if (item.id === 'premium_monthly') {
+            await AsyncStorage.setItem('pref_premium', 'true');
+            setPremiumMode(true);
+          }
+          Alert.alert('Already Owned', 'This item is already owned and has been restored.');
+        } else {
+          Alert.alert('Purchase Failed', errorMessage);
+        }
+        
+        setInFlight(false);
+        return;
+      }
+      
+      await BillingService.acknowledgeOrConsume(item.id, res.receipt);
+      
+      // Award points or set preferences
+      if (item.id.startsWith('points_')) {
+        const newPoints = await updatePoints(item.points);
+        setPoints(newPoints);
+      } else if (item.id === 'adfree_unlock') {
+        await AsyncStorage.setItem('pref_ad_free', 'true');
+        setAdFreeMode(true);
+      } else if (item.id === 'premium_monthly') {
+        await AsyncStorage.setItem('pref_premium', 'true');
+        setPremiumMode(true);
+      }
+      
+      Alert.alert('Purchase Successful', 'Purchased');
+      console.log(`Purchase completed: ${item.id}`);
+      
     } catch (error) {
-      console.error('Error completing purchase:', error);
-      Alert.alert('Error', 'Failed to complete purchase. Please try again.');
+      console.error('Purchase error:', error);
+      Alert.alert('Purchase Failed', 'An error occurred. Please try again.');
+    } finally {
+      setInFlight(false);
+    }
+  };
+
+  const restorePurchases = async () => {
+    try {
+      const ids = await BillingService.getActivePurchases();
+      
+      if (ids.includes('adfree_unlock')) {
+        await AsyncStorage.setItem('pref_ad_free', 'true');
+        setAdFreeMode(true);
+      }
+      
+      if (ids.includes('premium_monthly')) {
+        await AsyncStorage.setItem('pref_premium', 'true');
+        setPremiumMode(true);
+      }
+      
+      Alert.alert('Restore Complete', 'Restored');
+      console.log('Purchases restored:', ids);
+    } catch (error) {
+      console.error('Error restoring purchases:', error);
+      Alert.alert('Error', 'Failed to restore purchases.');
     }
   };
 
@@ -220,23 +240,16 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
     }
   };
 
-  const restorePurchases = async () => {
-    try {
-      // Re-load preferences (simulate restore)
-      await loadData();
-      Alert.alert('Restore Complete', 'Local preferences have been reloaded.');
-      console.log('Local purchases restored');
-    } catch (error) {
-      console.error('Error restoring purchases:', error);
-      Alert.alert('Error', 'Failed to restore purchases.');
-    }
-  };
-
   const renderPurchaseRow = (item: PurchaseItem) => (
     <Pressable
       key={item.id}
-      style={[styles.purchaseRow, { borderLeftColor: item.color }]}
+      style={[
+        styles.purchaseRow, 
+        { borderLeftColor: item.color },
+        inFlight && styles.disabledRow
+      ]}
       onPress={() => handlePurchase(item)}
+      disabled={inFlight}
     >
       <View style={styles.purchaseLeft}>
         <View style={styles.purchaseHeader}>
@@ -251,7 +264,9 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
       </View>
       
       <View style={[styles.pointsPill, { backgroundColor: item.color }]}>
-        <Text style={styles.pointsPillText}>+{item.points}</Text>
+        <Text style={styles.pointsPillText}>
+          {inFlight ? 'Processing...' : `+${item.points}`}
+        </Text>
       </View>
     </Pressable>
   );
@@ -307,9 +322,16 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
           )}
         </View>
 
-        {/* Premium Perks (Coming Soon) */}
+        {/* Premium Perks */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Premium Perks (Coming Soon)</Text>
+          <Text style={styles.sectionTitle}>Premium Perks</Text>
+          {renderToggleRow(
+            'Premium Monthly',
+            'Premium features and benefits.',
+            premiumMode,
+            () => {},
+            true
+          )}
           {renderToggleRow(
             'Unlimited Hints',
             'Use hints without spending points.',
@@ -329,22 +351,10 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
         {/* Footer */}
         <View style={styles.footer}>
           <TouchableOpacity style={styles.restoreButton} onPress={restorePurchases}>
-            <Text style={styles.restoreButtonText}>Restore local purchases</Text>
+            <Text style={styles.restoreButtonText}>Restore purchases</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
-
-      {/* Purchase Confirmation Modal */}
-      <ConfirmPurchaseModal
-        visible={showPurchaseModal}
-        item={selectedItem}
-        currentPoints={points}
-        onConfirm={confirmPurchase}
-        onCancel={() => {
-          setShowPurchaseModal(false);
-          setSelectedItem(null);
-        }}
-      />
     </View>
   );
 }
@@ -382,7 +392,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   headerSpacer: {
-    width: 60, // Same width as back button to center title
+    width: 60,
   },
   scrollView: {
     flex: 1,
@@ -438,6 +448,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  disabledRow: {
+    opacity: 0.6,
   },
   purchaseLeft: {
     flex: 1,
@@ -521,7 +534,6 @@ const styles = StyleSheet.create({
     color: colors.accent,
     textDecorationLine: 'underline',
   },
-  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -591,3 +603,6 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
 });
+
+// Export the updatePoints function for backward compatibility
+export { updatePoints } from '../utils/pointsManager';
