@@ -39,6 +39,11 @@ const STORAGE_KEYS = {
   POINTS: 'word_sprint_points',
 };
 
+// Scramble function as requested
+function scramble(word: string): string {
+  return word.split("").sort(() => Math.random() - 0.5).join("");
+}
+
 export default function WordSprintGame() {
   const [gameState, setGameState] = useState<GameState>({
     currentStage: 0,
@@ -52,6 +57,7 @@ export default function WordSprintGame() {
   const [message, setMessage] = useState('');
   const [revealedLetters, setRevealedLetters] = useState<number[]>([]);
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
+  const [currentScrambledWord, setCurrentScrambledWord] = useState('');
 
   const stages: Stage[] = wordsData as Stage[];
   const currentStageData = stages[gameState.currentStage];
@@ -64,6 +70,17 @@ export default function WordSprintGame() {
   useEffect(() => {
     saveGameState();
   }, [gameState]);
+
+  // Generate new scrambled word when level changes
+  useEffect(() => {
+    if (currentLevelData) {
+      setCurrentScrambledWord(scramble(currentLevelData.word));
+      setRevealedLetters([]);
+      setIsAnswerRevealed(false);
+      setMessage('');
+      setUserInput('');
+    }
+  }, [gameState.currentStage, gameState.currentLevel]);
 
   const loadGameState = async () => {
     try {
@@ -101,12 +118,18 @@ export default function WordSprintGame() {
     if (userAnswer === correctAnswer) {
       const basePoints = 10;
       const stageMultiplier = gameState.currentStage + 1;
-      const streakBonus = gameState.streak >= 2 ? 5 : 0;
+      let streakBonus = 0;
+      
+      // Streak bonus: +5 every 3 correct
+      const newStreak = gameState.streak + 1;
+      if (newStreak % 3 === 0) {
+        streakBonus = 5;
+      }
+      
       const totalPoints = basePoints * stageMultiplier + streakBonus;
 
-      setMessage(`Correct! +${totalPoints} points`);
+      setMessage(`Correct! +${totalPoints} points${streakBonus > 0 ? ` (${streakBonus} streak bonus!)` : ''}`);
       
-      const newStreak = gameState.streak + 1;
       const levelKey = `${gameState.currentStage}-${gameState.currentLevel}`;
       
       setGameState(prev => ({
@@ -153,7 +176,7 @@ export default function WordSprintGame() {
 
   const useHint = () => {
     if (gameState.points < 50) {
-      setMessage('Not enough points for hint!');
+      Alert.alert('Not enough points!', 'You need at least 50 points to use a hint.');
       return;
     }
 
@@ -182,7 +205,7 @@ export default function WordSprintGame() {
 
   const revealAnswer = () => {
     if (gameState.points < 200) {
-      setMessage('Not enough points for answer!');
+      Alert.alert('Not enough points!', 'You need at least 200 points to reveal the answer.');
       return;
     }
 
@@ -210,21 +233,22 @@ export default function WordSprintGame() {
   };
 
   const renderScrambledWord = () => {
-    if (!currentLevelData) return null;
+    if (!currentLevelData || !currentScrambledWord) return null;
 
-    const scrambledLetters = currentLevelData.scramble.split('');
+    const scrambledLetters = currentScrambledWord.split('');
     const word = currentLevelData.word;
 
     return (
       <View style={styles.scrambledContainer}>
         {scrambledLetters.map((letter, index) => {
-          const originalIndex = word.indexOf(letter);
-          const isRevealed = revealedLetters.includes(originalIndex) || isAnswerRevealed;
+          // Find if this letter position should be revealed
+          const wordIndex = word.toLowerCase().indexOf(letter.toLowerCase());
+          const isRevealed = revealedLetters.includes(wordIndex) || isAnswerRevealed;
           
           return (
-            <View key={index} style={styles.letterBox}>
-              <Text style={[styles.letterText, isRevealed && styles.revealedLetter]}>
-                {isRevealed ? word[originalIndex] : letter.toUpperCase()}
+            <View key={index} style={[styles.letterBox, isRevealed && styles.revealedLetterBox]}>
+              <Text style={[styles.letterText, isRevealed && styles.revealedLetterText]}>
+                {isRevealed ? word[wordIndex]?.toUpperCase() || letter.toUpperCase() : letter.toUpperCase()}
               </Text>
             </View>
           );
@@ -234,13 +258,19 @@ export default function WordSprintGame() {
   };
 
   const getStreakBonus = () => {
-    return gameState.streak >= 3 ? Math.floor(gameState.streak / 3) * 5 : 0;
+    return Math.floor(gameState.streak / 3) * 5;
   };
 
   if (!currentStageData || !currentLevelData) {
     return (
       <View style={commonStyles.container}>
         <Text style={commonStyles.title}>Game Complete!</Text>
+        <Text style={styles.completionText}>
+          Congratulations! You've completed all {stages.length} stages!
+        </Text>
+        <Text style={styles.finalScore}>
+          Final Score: {gameState.points} points
+        </Text>
         <Button text="Back to Home" onPress={() => router.back()} />
       </View>
     );
@@ -282,11 +312,16 @@ export default function WordSprintGame() {
           placeholderTextColor={colors.grey}
           autoCapitalize="none"
           autoCorrect={false}
+          editable={!isAnswerRevealed}
         />
 
         {/* Message Display */}
         {message ? (
-          <Text style={[styles.message, message.includes('Correct') && styles.successMessage]}>
+          <Text style={[
+            styles.message, 
+            message.includes('Correct') && styles.successMessage,
+            message.includes('Try again') && styles.errorMessage
+          ]}>
             {message}
           </Text>
         ) : null}
@@ -297,19 +332,25 @@ export default function WordSprintGame() {
         <Button
           text="Submit Answer"
           onPress={checkAnswer}
-          style={styles.submitButton}
+          style={[styles.submitButton, isAnswerRevealed && styles.disabledButton]}
         />
         
         <View style={styles.hintButtonRow}>
           <Button
             text={`Hint (50 pts)`}
             onPress={useHint}
-            style={[styles.hintButton, gameState.points < 50 && styles.disabledButton]}
+            style={[
+              styles.hintButton, 
+              (gameState.points < 50 || isAnswerRevealed) && styles.disabledButton
+            ]}
           />
           <Button
             text={`Answer (200 pts)`}
             onPress={revealAnswer}
-            style={[styles.answerButton, gameState.points < 200 && styles.disabledButton]}
+            style={[
+              styles.answerButton, 
+              (gameState.points < 200 || isAnswerRevealed) && styles.disabledButton
+            ]}
           />
         </View>
 
@@ -394,14 +435,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     margin: 4,
   },
+  revealedLetterBox: {
+    backgroundColor: colors.primary,
+    borderColor: colors.accent,
+  },
   letterText: {
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.text,
   },
-  revealedLetter: {
-    color: colors.accent,
-    backgroundColor: colors.primary,
+  revealedLetterText: {
+    color: colors.white,
   },
   input: {
     backgroundColor: colors.backgroundAlt,
@@ -423,6 +467,10 @@ const styles = StyleSheet.create({
   },
   successMessage: {
     color: colors.accent,
+    fontWeight: 'bold',
+  },
+  errorMessage: {
+    color: colors.error || '#ff4444',
     fontWeight: 'bold',
   },
   buttonContainer: {
@@ -457,5 +505,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.backgroundAlt,
     borderWidth: 1,
     borderColor: colors.grey,
+  },
+  completionText: {
+    fontSize: 16,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  finalScore: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.accent,
+    textAlign: 'center',
+    marginBottom: 30,
   },
 });

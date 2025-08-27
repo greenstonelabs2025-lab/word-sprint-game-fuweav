@@ -1,3 +1,4 @@
+
 import { StyleSheet, ViewStyle, TextStyle } from 'react-native';
 
 export const colors = {
@@ -9,6 +10,8 @@ export const colors = {
   text: '#e3e3e3',       // Keeping light text
   grey: '#90CAF9',       // Light Blue Grey
   card: '#193cb8',       // Keeping dark card background
+  white: '#ffffff',      // White color
+  error: '#ff4444',      // Error color
 };
 
 export const buttonStyles = StyleSheet.create({
