@@ -1,0 +1,18 @@
+
+WORD SPRINT — Natively Prompt Rules
+• ≤3500 chars • Complete • Fenced • Split if needed
+• Keep it modular • Match existing styles
+
+PROJECT STANDARDS:
+- UK English, concise, production-ready
+- Full files, no partial edits
+- GradientButton for consistency  
+- SafeArea + fullscreen backgrounds
+- TypeScript interfaces required
+- Console.log for debugging
+
+NAMING: WS-[TYPE][NUM] — Description
+TYPES: BG|UI|DATA|SVC|DC|STORE|MENU|LEVELS|FIX|RULES
+
+Established: React Native + Expo 53 + Supabase
+Word game with stages, levels, themes, daily challenges
