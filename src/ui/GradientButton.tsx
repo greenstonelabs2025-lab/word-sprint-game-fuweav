@@ -7,10 +7,10 @@ import {
   StyleSheet, 
   useWindowDimensions, 
   Platform,
-  AccessibilityInfo 
+  AccessibilityInfo,
+  ViewStyle 
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
 import Animated, { 
   useSharedValue, 
   withTiming, 
@@ -18,6 +18,7 @@ import Animated, {
   interpolate 
 } from 'react-native-reanimated';
 import { loadSettings } from '../../utils/settings';
+import { triggerHaptic, Haptic } from '../services/HapticsService';
 
 interface GradientButtonProps {
   title: string;
@@ -27,7 +28,8 @@ interface GradientButtonProps {
   iconRight?: boolean;
   disabled?: boolean;
   size?: "sm" | "md";
-  style?: any;
+  style?: ViewStyle;
+  haptic?: Haptic;
 }
 
 const GradientButton: React.FC<GradientButtonProps> = ({ 
@@ -38,7 +40,8 @@ const GradientButton: React.FC<GradientButtonProps> = ({
   iconRight = false,
   disabled = false,
   size = "md",
-  style 
+  style,
+  haptic = "light"
 }) => {
   const { width } = useWindowDimensions();
   const scale = useSharedValue(1);
@@ -67,14 +70,15 @@ const GradientButton: React.FC<GradientButtonProps> = ({
   const handlePressIn = () => {
     if (disabled) return;
     
+    // Trigger haptic feedback on press-in
+    if (settings.vibrate) {
+      triggerHaptic(haptic);
+    }
+    
     if (!settings.reduceMotion) {
       scale.value = withTiming(0.97, { duration: 100 });
     } else {
       opacity.value = withTiming(0.8, { duration: 100 });
-    }
-    
-    if (settings.vibrate) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   };
 

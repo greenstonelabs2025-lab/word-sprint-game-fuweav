@@ -17,6 +17,7 @@ import { colors } from '../styles/commonStyles';
 import { Settings, loadSettings, saveSetting, resetProgress } from '../utils/settings';
 import { track } from '../src/analytics/AnalyticsService';
 import GradientButton from '../src/ui/GradientButton';
+import { triggerHaptic } from '../src/services/HapticsService';
 
 interface SettingsPanelProps {
   visible: boolean;
@@ -57,6 +58,8 @@ export default function SettingsPanel({ visible, onClose }: SettingsPanelProps) 
 
   const updateSetting = async (key: keyof Settings, value: boolean) => {
     try {
+      triggerHaptic("light");
+      
       await saveSetting(key, value);
       setSettings(prev => ({ ...prev, [key]: value }));
       
@@ -152,7 +155,13 @@ export default function SettingsPanel({ visible, onClose }: SettingsPanelProps) 
             {/* Header */}
             <View style={styles.header}>
               <Text style={styles.title}>Settings</Text>
-              <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <TouchableOpacity 
+                style={styles.closeButton} 
+                onPress={() => {
+                  triggerHaptic("light");
+                  onClose();
+                }}
+              >
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
             </View>

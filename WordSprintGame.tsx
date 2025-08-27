@@ -24,6 +24,7 @@ import { updatePoints } from "./components/StoreScreen";
 import { colors } from "./styles/commonStyles";
 import { track } from "./src/analytics/AnalyticsService";
 import { getCache, isCacheEmpty, syncWordSets } from "./src/levelsync/SyncService";
+import { triggerHaptic } from "./src/services/HapticsService";
 
 // THEME0_CHECK: Verify themes are loaded correctly from wordBank
 console.log("THEME0_CHECK:", themes[0]);
@@ -357,6 +358,10 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     const tile = letterTiles[tileIndex];
     if (tile.disabled || currentGuess.length >= word.length) return;
     
+    if (settings.vibrate) {
+      triggerHaptic("light");
+    }
+    
     if (settings.sound) {
       playClick();
     }
@@ -375,6 +380,10 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
 
   const handleBackspace = () => {
     if (currentGuess.length === 0) return;
+    
+    if (settings.vibrate) {
+      triggerHaptic("light");
+    }
     
     if (settings.sound) {
       playClick();
@@ -395,6 +404,10 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
   const handleClear = () => {
     if (currentGuess.length === 0) return;
     
+    if (settings.vibrate) {
+      triggerHaptic("light");
+    }
+    
     if (settings.sound) {
       playClick();
     }
@@ -408,6 +421,10 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
   };
 
   const handleShuffle = () => {
+    if (settings.vibrate) {
+      triggerHaptic("light");
+    }
+    
     if (settings.sound) {
       playClick();
     }
@@ -547,6 +564,10 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
   };
 
   const check = () => {
+    if (settings.vibrate) {
+      triggerHaptic("light");
+    }
+    
     if (settings.sound) {
       playClick();
     }
@@ -572,6 +593,10 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
         word: targetWord
       });
       
+      if (settings.vibrate) {
+        triggerHaptic("success");
+      }
+      
       if (settings.sound) {
         playSuccess();
       }
@@ -594,6 +619,10 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
         word: targetWord,
         guess: guess
       });
+      
+      if (settings.vibrate) {
+        triggerHaptic("error");
+      }
       
       animateWrong();
       
@@ -729,6 +758,10 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
   };
 
   const handleMenuPress = () => {
+    if (settings.vibrate) {
+      triggerHaptic("light");
+    }
+    
     if (settings.sound) {
       playClick();
     }
@@ -737,6 +770,10 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
   };
 
   const handleStorePress = () => {
+    if (settings.vibrate) {
+      triggerHaptic("light");
+    }
+    
     if (settings.sound) {
       playClick();
     }
@@ -745,6 +782,10 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
   };
 
   const handleSettingsPress = () => {
+    if (settings.vibrate) {
+      triggerHaptic("light");
+    }
+    
     if (settings.sound) {
       playClick();
     }
@@ -752,6 +793,10 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
   };
 
   const handleFeedbackPress = () => {
+    if (settings.vibrate) {
+      triggerHaptic("light");
+    }
+    
     if (settings.sound) {
       playClick();
     }
@@ -778,6 +823,10 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
 
   const createPressHandlers = (pressScale: Animated.Value) => ({
     onPressIn: () => {
+      if (settings.vibrate) {
+        triggerHaptic("light");
+      }
+      
       if (!settings.reduceMotion) {
         Animated.spring(pressScale, {
           toValue: 0.96,

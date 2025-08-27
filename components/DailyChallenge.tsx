@@ -21,6 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../app/integrations/supabase/client';
 import { track } from '../src/analytics/AnalyticsService';
 import GradientButton from '../src/ui/GradientButton';
+import { triggerHaptic } from '../src/services/HapticsService';
 import {
   generateDailyWord,
   getTodayKey,
@@ -77,13 +78,17 @@ function PremiumModal({ visible, onClose }: PremiumModalProps) {
           <View style={styles.premiumModalButtons}>
             <TouchableOpacity
               style={[styles.premiumModalButton, styles.closeButton]}
-              onPress={onClose}
+              onPress={() => {
+                triggerHaptic("light");
+                onClose();
+              }}
             >
               <Text style={styles.premiumModalButtonText}>Close</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.premiumModalButton, styles.notifyButton]}
               onPress={() => {
+                triggerHaptic("light");
                 console.log('User wants to be notified about Premium');
                 Alert.alert('Thanks!', 'We\'ll notify you when Premium is available.');
                 onClose();
@@ -170,7 +175,13 @@ function LeaderboardModal({ visible, onClose }: LeaderboardModalProps) {
           {/* Header */}
           <View style={styles.leaderboardHeader}>
             <Text style={styles.leaderboardTitle}>Today's Leaderboard</Text>
-            <TouchableOpacity style={styles.closeIconButton} onPress={onClose}>
+            <TouchableOpacity 
+              style={styles.closeIconButton} 
+              onPress={() => {
+                triggerHaptic("light");
+                onClose();
+              }}
+            >
               <Text style={styles.closeIconText}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -184,7 +195,13 @@ function LeaderboardModal({ visible, onClose }: LeaderboardModalProps) {
             ) : error ? (
               <View style={styles.errorContainer}>
                 <Text style={styles.errorText}>{error}</Text>
-                <TouchableOpacity style={styles.retryButton} onPress={fetchLeaderboard}>
+                <TouchableOpacity 
+                  style={styles.retryButton} 
+                  onPress={() => {
+                    triggerHaptic("light");
+                    fetchLeaderboard();
+                  }}
+                >
                   <Text style={styles.retryButtonText}>Retry</Text>
                 </TouchableOpacity>
               </View>
@@ -425,6 +442,10 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
 
     if (input.toLowerCase().trim() === dailyWord.toLowerCase()) {
       // Correct answer!
+      if (settings.vibrate) {
+        triggerHaptic("success");
+      }
+      
       animateCorrect();
       
       try {
@@ -457,6 +478,10 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
       }
     } else {
       // Wrong answer
+      if (settings.vibrate) {
+        triggerHaptic("error");
+      }
+      
       animateWrong();
       
       // Track wrong answer in daily challenge
@@ -535,7 +560,12 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
           <View style={styles.leaderboardContainer}>
             <TouchableOpacity
               style={styles.viewLeaderboardButton}
-              onPress={() => setShowLeaderboardModal(true)}
+              onPress={() => {
+                if (settings.vibrate) {
+                  triggerHaptic("light");
+                }
+                setShowLeaderboardModal(true);
+              }}
             >
               <Text style={styles.viewLeaderboardButtonText}>View Leaderboard</Text>
             </TouchableOpacity>
@@ -543,7 +573,12 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
           
           <TouchableOpacity
             style={styles.backButton}
-            onPress={onExit}
+            onPress={() => {
+              if (settings.vibrate) {
+                triggerHaptic("light");
+              }
+              onExit();
+            }}
           >
             <Text style={styles.backButtonText}>Back to Menu</Text>
           </TouchableOpacity>
@@ -645,7 +680,12 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
         <View style={styles.leaderboardContainer}>
           <TouchableOpacity
             style={styles.viewLeaderboardButton}
-            onPress={() => setShowLeaderboardModal(true)}
+            onPress={() => {
+              if (settings.vibrate) {
+                triggerHaptic("light");
+              }
+              setShowLeaderboardModal(true);
+            }}
           >
             <Text style={styles.viewLeaderboardButtonText}>View Leaderboard</Text>
           </TouchableOpacity>
@@ -669,6 +709,9 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
             <TouchableOpacity
               style={styles.confirmButton}
               onPress={() => {
+                if (settings.vibrate) {
+                  triggerHaptic("light");
+                }
                 setShowSuccessModal(false);
                 // Stay on the completed screen
               }}

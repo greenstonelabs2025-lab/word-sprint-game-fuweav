@@ -9,6 +9,7 @@ import {
   Animated 
 } from 'react-native';
 import { colors } from '../styles/commonStyles';
+import { triggerHaptic, Haptic } from '../src/services/HapticsService';
 
 interface ButtonProps {
   text: string;
@@ -16,25 +17,39 @@ interface ButtonProps {
   style?: ViewStyle | ViewStyle[];
   textStyle?: TextStyle;
   disabled?: boolean;
+  haptic?: Haptic;
 }
 
-export default function Button({ text, onPress, style, textStyle, disabled = false }: ButtonProps) {
+export default function Button({ 
+  text, 
+  onPress, 
+  style, 
+  textStyle, 
+  disabled = false,
+  haptic = "light"
+}: ButtonProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
-    Animated.timing(scaleAnim, {
-      toValue: 0.97,
-      duration: 100,
-      useNativeDriver: true,
-    }).start();
+    if (!disabled) {
+      triggerHaptic(haptic);
+      
+      Animated.timing(scaleAnim, {
+        toValue: 0.97,
+        duration: 100,
+        useNativeDriver: true,
+      }).start();
+    }
   };
 
   const handlePressOut = () => {
-    Animated.timing(scaleAnim, {
-      toValue: 1,
-      duration: 100,
-      useNativeDriver: true,
-    }).start();
+    if (!disabled) {
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }).start();
+    }
   };
 
   return (

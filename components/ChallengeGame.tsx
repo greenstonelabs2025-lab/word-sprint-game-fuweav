@@ -19,6 +19,7 @@ import { updatePoints } from '../utils/pointsManager';
 import { track } from '../src/analytics/AnalyticsService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import GradientButton from '../src/ui/GradientButton';
+import { triggerHaptic } from '../src/services/HapticsService';
 
 interface ChallengeGameProps {
   visible: boolean;
@@ -202,7 +203,7 @@ export default function ChallengeGame({ visible, challengeName, words, onExit }:
       // Correct answer
       animateCorrect();
       if (settings.vibrate) {
-        Vibration.vibrate(100);
+        triggerHaptic("success");
       }
 
       const pointsEarned = POINTS_PER_WORD;
@@ -233,7 +234,7 @@ export default function ChallengeGame({ visible, challengeName, words, onExit }:
       // Wrong answer
       animateWrong();
       if (settings.vibrate) {
-        Vibration.vibrate([100, 50, 100]);
+        triggerHaptic("error");
       }
 
       // Track analytics

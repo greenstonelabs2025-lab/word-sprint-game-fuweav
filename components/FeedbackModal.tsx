@@ -18,6 +18,7 @@ import { colors } from '../styles/commonStyles';
 import { track } from '../src/analytics/AnalyticsService';
 import { loadSettings } from '../utils/settings';
 import GradientButton from '../src/ui/GradientButton';
+import { triggerHaptic } from '../src/services/HapticsService';
 
 interface FeedbackModalProps {
   visible: boolean;
@@ -275,7 +276,10 @@ export default function FeedbackModal({
             </Text>
             <TouchableOpacity
               style={[styles.closeButton, settings.highContrast && styles.highContrastBorder]}
-              onPress={handleClose}
+              onPress={() => {
+                triggerHaptic("light");
+                handleClose();
+              }}
               disabled={isSubmitting}
             >
               <Text style={[styles.closeButtonText, settings.highContrast && styles.highContrastText]}>
@@ -299,7 +303,10 @@ export default function FeedbackModal({
                     settings.highContrast && styles.highContrastBorder,
                     settings.highContrast && category === cat && styles.highContrastSelected,
                   ]}
-                  onPress={() => setCategory(cat)}
+                  onPress={() => {
+                    triggerHaptic("light");
+                    setCategory(cat);
+                  }}
                   disabled={isSubmitting}
                 >
                   <Text

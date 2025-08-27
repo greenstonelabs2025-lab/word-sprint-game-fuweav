@@ -18,6 +18,7 @@ import * as BillingService from '../billing/BillingService';
 import { updatePoints } from '../utils/pointsManager';
 import { track } from '../src/analytics/AnalyticsService';
 import GradientButton from '../src/ui/GradientButton';
+import { triggerHaptic } from '../src/services/HapticsService';
 
 interface StoreScreenProps {
   onExit: () => void;
@@ -264,6 +265,8 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
 
   const toggleAdFree = async (value: boolean) => {
     try {
+      triggerHaptic("light");
+      
       await AsyncStorage.setItem('pref_ad_free', value.toString());
       setAdFreeMode(value);
       

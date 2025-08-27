@@ -18,7 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
+import { triggerHaptic } from '../src/services/HapticsService';
 
 import SettingsPanel from './SettingsPanel';
 import FeedbackModal from './FeedbackModal';
@@ -295,7 +295,15 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore, onChallen
           </View>
           
           {/* Refresh background link */}
-          <TouchableOpacity onPress={refreshBackground} style={styles.refreshLink}>
+          <TouchableOpacity 
+            onPress={() => {
+              if (settings.vibrate) {
+                triggerHaptic("light");
+              }
+              refreshBackground();
+            }} 
+            style={styles.refreshLink}
+          >
             <Text style={styles.refreshLinkText}>Refresh background</Text>
           </TouchableOpacity>
         </View>
