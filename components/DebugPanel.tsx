@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -8,7 +9,6 @@ import {
   Alert,
   useWindowDimensions,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { clearStaleCache, resetGameProgress, clearWordSetsCache } from '../utils/cacheManager';
 import GradientButton from '../src/ui/GradientButton';
 import { colors } from '../styles/commonStyles';
@@ -18,31 +18,69 @@ interface DebugPanelProps {
   onClose: () => void;
 }
 
+const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: colors.backgroundAlt,
+    borderRadius: 16,
+    padding: 24,
+    margin: 20,
+    minWidth: 300,
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  description: {
+    fontSize: 14,
+    color: colors.grey,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  buttonContainer: {
+    width: '100%',
+    gap: 12,
+  },
+  button: {
+    width: '100%',
+  },
+  closeButton: {
+    marginTop: 8,
+  },
+});
+
 export default function DebugPanel({ visible, onClose }: DebugPanelProps) {
   const { width } = useWindowDimensions();
-  const [isClearing, setIsClearing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleClearStaleCache = async () => {
     try {
-      setIsClearing(true);
+      setIsLoading(true);
       await clearStaleCache();
-      Alert.alert(
-        'Cache Cleared',
-        'Stale cache has been cleared. Please restart the app to see the new Shapes theme.',
-        [{ text: 'OK', onPress: onClose }]
-      );
+      Alert.alert('Success', 'Stale cache cleared successfully. Restart the app to see changes.');
     } catch (error) {
-      Alert.alert('Error', 'Failed to clear cache. Please try again.');
-      console.error('Cache clear error:', error);
+      console.error('Error clearing stale cache:', error);
+      Alert.alert('Error', 'Failed to clear stale cache. Please try again.');
     } finally {
-      setIsClearing(false);
+      setIsLoading(false);
     }
   };
 
   const handleResetProgress = async () => {
     Alert.alert(
       'Reset Progress',
-      'This will reset your game progress to Stage 1, Level 1. Are you sure?',
+      'This will reset your game progress to the beginning. Are you sure?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -50,46 +88,51 @@ export default function DebugPanel({ visible, onClose }: DebugPanelProps) {
           style: 'destructive',
           onPress: async () => {
             try {
-              setIsClearing(true);
+              setIsLoading(true);
               await resetGameProgress();
-              Alert.alert(
-                'Progress Reset',
-                'Game progress has been reset. Please restart the app.',
-                [{ text: 'OK', onPress: onClose }]
-              );
+              Alert.alert('Success', 'Game progress reset successfully. Restart the app to see changes.');
             } catch (error) {
+              console.error('Error resetting progress:', error);
               Alert.alert('Error', 'Failed to reset progress. Please try again.');
-              console.error('Progress reset error:', error);
             } finally {
-              setIsClearing(false);
+              setIsLoading(false);
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
 
   const handleClearWordSetsCache = async () => {
-    try {
-      setIsClearing(true);
-      await clearWordSetsCache();
-      Alert.alert(
-        'Word Sets Cache Cleared',
-        'Word sets cache has been cleared. The app will reload themes from the local wordBank.',
-        [{ text: 'OK', onPress: onClose }]
-      );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to clear word sets cache. Please try again.');
-      console.error('Word sets cache clear error:', error);
-    } finally {
-      setIsClearing(false);
-    }
+    Alert.alert(
+      'Clear Word Sets Cache',
+      'This will clear all cached word sets and force a re-sync. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              await clearWordSetsCache();
+              Alert.alert('Success', 'Word sets cache cleared successfully. Restart the app to see changes.');
+            } catch (error) {
+              console.error('Error clearing word sets cache:', error);
+              Alert.alert('Error', 'Failed to clear word sets cache. Please try again.');
+            } finally {
+              setIsLoading(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleClearAllData = async () => {
     Alert.alert(
       'Clear All Data',
-      'This will clear ALL app data including progress, settings, and cache. Are you sure?',
+      'This will clear ALL app data including progress, settings, and cache. This cannot be undone!',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -97,21 +140,44 @@ export default function DebugPanel({ visible, onClose }: DebugPanelProps) {
           style: 'destructive',
           onPress: async () => {
             try {
-              setIsClearing(true);
+              setIsLoading(true);
               await AsyncStorage.clear();
-              Alert.alert(
-                'All Data Cleared',
-                'All app data has been cleared. Please restart the app.',
-                [{ text: 'OK', onPress: onClose }]
-              );
+              Alert.alert('Success', 'All app data cleared successfully. Restart the app to see changes.');
             } catch (error) {
+              console.error('Error clearing all data:', error);
               Alert.alert('Error', 'Failed to clear all data. Please try again.');
-              console.error('Clear all data error:', error);
             } finally {
-              setIsClearing(false);
+              setIsLoading(false);
             }
-          }
-        }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleClearProgressOnly = async () => {
+    Alert.alert(
+      'Clear Progress Cache',
+      'This will clear the progress cache to force the app to pick up new themes. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              await AsyncStorage.removeItem("progress");
+              console.log('Progress cache cleared for theme update');
+              Alert.alert('Success', 'Progress cache cleared successfully. Restart the app to see changes.');
+            } catch (error) {
+              console.error('Error clearing progress cache:', error);
+              Alert.alert('Error', 'Failed to clear progress cache. Please try again.');
+            } finally {
+              setIsLoading(false);
+            }
+          },
+        },
       ]
     );
   };
@@ -124,105 +190,63 @@ export default function DebugPanel({ visible, onClose }: DebugPanelProps) {
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { maxWidth: width - 40 }]}>
-          <Text style={styles.modalTitle}>Debug Panel</Text>
-          <Text style={styles.modalSubtitle}>
-            Use these tools to clear cache and reset data
+        <View style={[styles.modalContent, { maxWidth: Math.min(400, width - 40) }]}>
+          <Text style={styles.title}>Debug Panel</Text>
+          <Text style={styles.description}>
+            Use these tools to clear cache and reset data for debugging purposes.
           </Text>
 
           <View style={styles.buttonContainer}>
             <GradientButton
+              title="Clear Progress Cache"
+              onPress={handleClearProgressOnly}
+              colors={['#FF9800', '#F57C00']}
+              disabled={isLoading}
+              style={styles.button}
+            />
+
+            <GradientButton
               title="Clear Stale Cache"
               onPress={handleClearStaleCache}
-              colors={[colors.accent, colors.primary]}
-              disabled={isClearing}
-              style={styles.debugButton}
+              colors={['#2196F3', '#1976D2']}
+              disabled={isLoading}
+              style={styles.button}
             />
 
             <GradientButton
               title="Reset Game Progress"
               onPress={handleResetProgress}
-              colors={['#FF8A80', '#E53935']}
-              disabled={isClearing}
-              style={styles.debugButton}
+              colors={['#FF5722', '#D84315']}
+              disabled={isLoading}
+              style={styles.button}
             />
 
             <GradientButton
               title="Clear Word Sets Cache"
               onPress={handleClearWordSetsCache}
-              colors={['#FFD54F', '#FFA000']}
-              disabled={isClearing}
-              style={styles.debugButton}
+              colors={['#9C27B0', '#7B1FA2']}
+              disabled={isLoading}
+              style={styles.button}
             />
 
             <GradientButton
               title="Clear All Data"
               onPress={handleClearAllData}
-              colors={['#F44336', '#D32F2F']}
-              disabled={isClearing}
-              style={styles.debugButton}
+              colors={['#F44336', '#C62828']}
+              disabled={isLoading}
+              style={styles.button}
             />
 
             <GradientButton
               title="Close"
               onPress={onClose}
               colors={[colors.grey + '60', colors.grey + '40']}
-              style={[styles.debugButton, styles.closeButton]}
+              disabled={isLoading}
+              style={[styles.button, styles.closeButton]}
             />
           </View>
-
-          {isClearing && (
-            <Text style={styles.loadingText}>Processing...</Text>
-          )}
         </View>
       </View>
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: colors.backgroundAlt,
-    borderRadius: 16,
-    padding: 24,
-    margin: 20,
-    minWidth: 300,
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: colors.grey,
-    marginBottom: 24,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  buttonContainer: {
-    width: '100%',
-    gap: 12,
-  },
-  debugButton: {
-    width: '100%',
-  },
-  closeButton: {
-    marginTop: 8,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: colors.accent,
-    marginTop: 16,
-    textAlign: 'center',
-  },
-});

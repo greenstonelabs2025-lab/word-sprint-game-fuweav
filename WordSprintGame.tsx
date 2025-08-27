@@ -25,6 +25,9 @@ import { colors } from "./styles/commonStyles";
 import { track } from "./src/analytics/AnalyticsService";
 import { getCache, isCacheEmpty, syncWordSets } from "./src/levelsync/SyncService";
 
+// Debug log to verify themes are loaded correctly
+console.log("THEMES_0=", themes[0]);
+
 interface ConfirmationPopupProps {
   visible: boolean;
   title: string;
@@ -316,28 +319,45 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
 
   const loadProgress = async () => {
     try {
+      // Clear stale data on next launch (one-time cache clear)
+      await AsyncStorage.removeItem("progress");
+      console.log('Cleared stale progress data');
+      
       const d = await AsyncStorage.getItem("progress");
+      let stored = { stage: 0, level: 0, points: 100 };
+      
       if (d) {
-        let { stage: s, level: l, points: p } = JSON.parse(d);
-        
-        // Add bounds check to prevent crashes if indexes shifted
-        if (s >= themes.length) {
-          console.log('Stage index out of bounds, resetting progress');
-          s = 0;
-          l = 0;
-          p = 0;
-        }
-        
-        setStage(s);
-        setLevel(l);
-        setPoints(p);
-        const w = getWordForLevel(s, l);
-        setWord(w);
-        setScrambled(scramble(w));
-        console.log(`Loaded progress: Stage ${s + 1}, Level ${l + 1}, Points ${p}`);
+        stored = JSON.parse(d);
+        console.log('Loaded stored progress:', stored);
       }
+      
+      // Add safety check to prevent crashes if indexes shifted
+      if (stored.stage >= themes.length) {
+        console.log('Stage index out of bounds, resetting to stage 0');
+        stored.stage = 0;
+        stored.level = 0;
+        stored.points = 100;
+      }
+      
+      setStage(stored.stage);
+      setLevel(stored.level);
+      setPoints(stored.points);
+      
+      // Set word from themes after setting stage/level
+      const w = getWordForLevel(stored.stage, stored.level);
+      setWord(w);
+      setScrambled(scramble(w));
+      
+      console.log(`Progress loaded: Stage ${stored.stage + 1}, Level ${stored.level + 1}, Points ${stored.points}, Word: ${w}`);
     } catch (e) {
       console.log('Error loading progress:', e);
+      // Set defaults
+      setStage(0);
+      setLevel(0);
+      setPoints(100);
+      const w = getWordForLevel(0, 0);
+      setWord(w);
+      setScrambled(scramble(w));
     }
   };
 
