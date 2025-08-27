@@ -676,8 +676,7 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
       />
 
       {/* Top HUD Bar */}
-      <View style={styles.hudBar}>
-        {/* Left: Menu Button */}
+      <View style={styles.hud}>
         <View style={styles.hudLeft}>
           {onExit && (
             <GradientButton
@@ -685,22 +684,16 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
               onPress={handleMenuPress}
               colors={['#3A4A6A', '#23314A']}
               size="sm"
-              style={styles.menuButtonStyle}
             />
           )}
         </View>
-
-        {/* Center: Title */}
         <View style={styles.hudCenter}>
           <Text style={styles.hudTitle}>WORD SPRINT</Text>
         </View>
-
-        {/* Right: Points and Streak Pill */}
         <View style={styles.hudRight}>
-          <View style={styles.pointsPill}>
-            <Text style={styles.pointsText}>{gameState.points}</Text>
-            <Text style={styles.streakText}>Streak: {gameState.streak}</Text>
-          </View>
+          <Text style={styles.hudMeta} numberOfLines={1} adjustsFontSizeToFit>
+            Pts: {gameState.points}
+          </Text>
         </View>
       </View>
 
@@ -894,53 +887,37 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   
-  // HUD Bar Styles
-  hudBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: Platform.OS === 'ios' ? 50 : 12,
-  },
-  hudLeft: {
-    flex: 1,
-    alignItems: 'flex-start',
-  },
-  hudCenter: {
-    flex: 2,
-    alignItems: 'center',
-  },
-  hudRight: {
-    flex: 1,
-    alignItems: 'flex-end',
-  },
-  hudTitle: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    letterSpacing: 2,
-    color: 'white',
-    textAlign: 'center',
-  },
-  menuButtonStyle: {
-    width: 50,
-    height: 36,
-  },
-  pointsPill: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  // HUD 3-column layout
+  hud: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    alignItems: 'center',
+    paddingVertical: 8,
+    width: "100%",
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(0,0,0,0.25)",
+    paddingTop: Platform.OS === 'ios' ? 50 : 12,
+    zIndex: 1000,
   },
-  pointsText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+  hudLeft: { flex: 1, alignItems: "flex-start" },
+  hudCenter: { flex: 2, alignItems: "center", justifyContent: "center" },
+  hudRight: { flex: 1, alignItems: "flex-end" },
+  hudTitle: {
+    fontSize: 20, 
+    fontWeight: "700", 
+    letterSpacing: 1, 
+    textAlign: "center",
+    color: "#fff"
   },
-  streakText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-    fontWeight: '500',
+  hudMeta: { 
+    fontSize: 16, 
+    fontWeight: "600", 
+    textAlign: "right",
+    color: "#fff"
   },
 
   // Game Card Styles

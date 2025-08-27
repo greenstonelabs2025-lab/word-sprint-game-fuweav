@@ -332,26 +332,25 @@ export default function ChallengeGame({ visible, challengeName, words, onExit }:
     >
       <View style={styles.container}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.exitButton}
-            onPress={handleExit}
-          >
-            <Text style={styles.exitButtonText}>✕</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.headerCenter}>
-            <Text style={styles.challengeTitle}>
+        <View style={styles.hud}>
+          <View style={styles.hudLeft}>
+            <GradientButton
+              title="🏠"
+              onPress={handleExit}
+              colors={['#3A4A6A', '#23314A']}
+              size="sm"
+            />
+          </View>
+          <View style={styles.hudCenter}>
+            <Text style={styles.hudTitle}>
               {challengeName}
-              {isDemoSet && <Text style={styles.demoTag}> (Demo Set)</Text>}
-            </Text>
-            <Text style={styles.progressText}>
-              {currentWordIndex + 1} of {targetWords}
+              {isDemoSet && <Text style={styles.demoTag}> (Demo)</Text>}
             </Text>
           </View>
-          
-          <View style={styles.pointsContainer}>
-            <Text style={styles.pointsText}>{totalPoints} pts</Text>
+          <View style={styles.hudRight}>
+            <Text style={styles.hudMeta} numberOfLines={1} adjustsFontSizeToFit>
+              Pts: {totalPoints}
+            </Text>
           </View>
         </View>
 
@@ -448,50 +447,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
+  // HUD 3-column layout
+  hud: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    width: "100%",
+    backgroundColor: "rgba(0,0,0,0.25)",
     paddingTop: 60,
-    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  exitButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.grey + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
+  hudLeft: { flex: 1, alignItems: "flex-start" },
+  hudCenter: { flex: 2, alignItems: "center", justifyContent: "center" },
+  hudRight: { flex: 1, alignItems: "flex-end" },
+  hudTitle: {
+    fontSize: 20, 
+    fontWeight: "700", 
+    letterSpacing: 1, 
+    textAlign: "center",
+    color: colors.text
   },
-  exitButtonText: {
-    fontSize: 18,
-    color: colors.text,
-    fontWeight: 'bold',
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  challengeTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  progressText: {
-    fontSize: 14,
-    color: colors.grey,
-    marginTop: 2,
-  },
-  pointsContainer: {
-    alignItems: 'flex-end',
-  },
-  pointsText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.accent,
+  hudMeta: { 
+    fontSize: 16, 
+    fontWeight: "600", 
+    textAlign: "right",
+    color: colors.accent
   },
   progressBarContainer: {
     height: 4,

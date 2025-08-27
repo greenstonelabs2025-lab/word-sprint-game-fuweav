@@ -508,17 +508,22 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
     return (
       <View style={[styles.container, { backgroundColor: getThemeBackground() }]}>
         {/* HUD Bar */}
-        <View style={styles.hudBar}>
-          <TouchableOpacity style={styles.menuButton} onPress={onExit}>
-            <Text style={styles.menuButtonText}>Menu</Text>
-          </TouchableOpacity>
-          
-          <Text style={styles.gameTitle}>DAILY CHALLENGE</Text>
-          
+        <View style={styles.hud}>
+          <View style={styles.hudLeft}>
+            <GradientButton
+              title="🏠"
+              onPress={onExit}
+              colors={['#3A4A6A', '#23314A']}
+              size="sm"
+            />
+          </View>
+          <View style={styles.hudCenter}>
+            <Text style={styles.hudTitle}>DAILY CHALLENGE</Text>
+          </View>
           <View style={styles.hudRight}>
-            <View style={styles.pointsPill}>
-              <Text style={styles.pointsText}>{points}</Text>
-            </View>
+            <Text style={styles.hudMeta} numberOfLines={1} adjustsFontSizeToFit>
+              Pts: {points}
+            </Text>
           </View>
         </View>
 
@@ -559,17 +564,22 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
       style={styles.container}
     >
       {/* HUD Bar */}
-      <View style={styles.hudBar}>
-        <TouchableOpacity style={styles.menuButton} onPress={onExit}>
-          <Text style={styles.menuButtonText}>Menu</Text>
-        </TouchableOpacity>
-        
-        <Text style={styles.gameTitle}>DAILY CHALLENGE</Text>
-        
+      <View style={styles.hud}>
+        <View style={styles.hudLeft}>
+          <GradientButton
+            title="🏠"
+            onPress={onExit}
+            colors={['#3A4A6A', '#23314A']}
+            size="sm"
+          />
+        </View>
+        <View style={styles.hudCenter}>
+          <Text style={styles.hudTitle}>DAILY CHALLENGE</Text>
+        </View>
         <View style={styles.hudRight}>
-          <View style={styles.pointsPill}>
-            <Text style={styles.pointsText}>{points}</Text>
-          </View>
+          <Text style={styles.hudMeta} numberOfLines={1} adjustsFontSizeToFit>
+            Pts: {points}
+          </Text>
         </View>
       </View>
 
@@ -691,45 +701,32 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 50,
   },
-  hudBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  menuButton: {
+  // HUD 3-column layout
+  hud: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 6,
+    paddingVertical: 8,
+    width: "100%",
+    backgroundColor: "rgba(0,0,0,0.25)",
+    paddingTop: 10,
   },
-  menuButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
+  hudLeft: { flex: 1, alignItems: "flex-start" },
+  hudCenter: { flex: 2, alignItems: "center", justifyContent: "center" },
+  hudRight: { flex: 1, alignItems: "flex-end" },
+  hudTitle: {
+    fontSize: 20, 
+    fontWeight: "700", 
+    letterSpacing: 1, 
+    textAlign: "center",
+    color: "#fff"
   },
-  gameTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    letterSpacing: 2,
-  },
-  hudRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  pointsPill: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  pointsText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
+  hudMeta: { 
+    fontSize: 16, 
+    fontWeight: "600", 
+    textAlign: "right",
+    color: "#fff"
   },
   gameContent: {
     flex: 1,

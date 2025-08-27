@@ -335,15 +335,23 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <GradientButton
-          title="← Back"
-          onPress={onExit}
-          colors={[colors.primary, colors.accent]}
-          style={styles.backButton}
-        />
-        <Text style={styles.title}>Store</Text>
-        <View style={styles.headerSpacer} />
+      <View style={styles.hud}>
+        <View style={styles.hudLeft}>
+          <GradientButton
+            title="🏠"
+            onPress={onExit}
+            colors={['#3A4A6A', '#23314A']}
+            size="sm"
+          />
+        </View>
+        <View style={styles.hudCenter}>
+          <Text style={styles.hudTitle}>STORE</Text>
+        </View>
+        <View style={styles.hudRight}>
+          <Text style={styles.hudMeta} numberOfLines={1} adjustsFontSizeToFit>
+            Pts: {points}
+          </Text>
+        </View>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -430,27 +438,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  // HUD 3-column layout
+  hud: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    width: "100%",
+    backgroundColor: "rgba(0,0,0,0.25)",
     paddingTop: 50,
-    backgroundColor: colors.backgroundAlt,
     borderBottomWidth: 1,
     borderBottomColor: colors.grey + '20',
   },
-  backButton: {
-    width: 80,
+  hudLeft: { flex: 1, alignItems: "flex-start" },
+  hudCenter: { flex: 2, alignItems: "center", justifyContent: "center" },
+  hudRight: { flex: 1, alignItems: "flex-end" },
+  hudTitle: {
+    fontSize: 20, 
+    fontWeight: "700", 
+    letterSpacing: 1, 
+    textAlign: "center",
+    color: colors.text
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  headerSpacer: {
-    width: 80,
+  hudMeta: { 
+    fontSize: 16, 
+    fontWeight: "600", 
+    textAlign: "right",
+    color: colors.text
   },
   scrollView: {
     flex: 1,

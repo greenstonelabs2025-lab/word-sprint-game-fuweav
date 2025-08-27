@@ -1009,35 +1009,35 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     <View style={containerStyle}>
       {/* Fixed HUD Bar */}
       <View style={[
-        styles.hudContainer,
-        settings.highContrast && styles.hudContainerHighContrast
+        styles.hud,
+        settings.highContrast && { backgroundColor: "#000" }
       ]}>
-        {/* Left: Home Button */}
-        {onExit && (
-          <GradientButton
-            title="🏠"
-            onPress={handleMenuPress}
-            colors={['#3A4A6A', '#23314A']}
-            size="sm"
-            style={styles.hudHomeButton}
-          />
-        )}
-        
-        {/* Center: Title */}
-        <Text style={[
-          styles.hudTitle,
-          settings.highContrast && styles.hudTitleHighContrast
-        ]}>
-          Word Sprint
-        </Text>
-        
-        {/* Right: Points */}
-        <Text style={[
-          styles.hudPoints,
-          settings.highContrast && styles.hudPointsHighContrast
-        ]}>
-          Pts: {points}
-        </Text>
+        <View style={styles.hudLeft}>
+          {onExit && (
+            <GradientButton
+              title="🏠"
+              onPress={handleMenuPress}
+              colors={['#3A4A6A', '#23314A']}
+              size="sm"
+            />
+          )}
+        </View>
+        <View style={styles.hudCenter}>
+          <Text style={[
+            styles.hudTitle,
+            settings.highContrast && { color: "#fff" }
+          ]}>
+            WORD SPRINT
+          </Text>
+        </View>
+        <View style={styles.hudRight}>
+          <Text style={[
+            styles.hudMeta,
+            settings.highContrast && { color: "#fff" }
+          ]} numberOfLines={1} adjustsFontSizeToFit>
+            Pts: {points}
+          </Text>
+        </View>
       </View>
 
       {/* Success Banner */}
@@ -1248,51 +1248,37 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 50,
   },
-  // Fixed HUD Container
-  hudContainer: {
-    width: '100%',
+  // HUD 3-column layout
+  hud: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    width: "100%",
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: "rgba(0,0,0,0.25)",
+    paddingTop: 10,
     zIndex: 1000,
   },
-  hudContainerHighContrast: {
-    backgroundColor: '#000000',
-  },
-  // Left: Home Button
-  hudHomeButton: {
-    width: 50,
-    height: 36,
-  },
-  // Center: Title
+  hudLeft: { flex: 1, alignItems: "flex-start" },
+  hudCenter: { flex: 2, alignItems: "center", justifyContent: "center" },
+  hudRight: { flex: 1, alignItems: "flex-end" },
   hudTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    letterSpacing: 1,
+    fontSize: 20, 
+    fontWeight: "700", 
+    letterSpacing: 1, 
+    textAlign: "center",
+    color: "#fff"
   },
-  hudTitleHighContrast: {
-    color: '#ffffff',
-  },
-  // Right: Points
-  hudPoints: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ffffff',
-    textAlign: 'right',
-    minWidth: 80,
-  },
-  hudPointsHighContrast: {
-    color: '#ffffff',
+  hudMeta: { 
+    fontSize: 16, 
+    fontWeight: "600", 
+    textAlign: "right",
+    color: "#fff"
   },
   banner: {
     position: 'absolute',
