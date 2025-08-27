@@ -1,18 +1,37 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, Modal, TouchableOpacity, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Button from './Button';
 import SettingsPanel from './SettingsPanel';
 import { colors, commonStyles } from '../styles/commonStyles';
+import { isDailyChallengeCompleted } from '../utils/dailyChallenge';
 
 interface MainMenuProps {
   onStart: () => void;
+  onDailyChallenge: () => void;
+  onStore: () => void;
 }
 
-export default function MainMenu({ onStart }: MainMenuProps) {
+export default function MainMenu({ onStart, onDailyChallenge, onStore }: MainMenuProps) {
   const [rulesVisible, setRulesVisible] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [isDailyChallengeCompletedToday, setIsDailyChallengeCompletedToday] = useState(false);
+
+  useEffect(() => {
+    checkDailyChallengeStatus();
+  }, []);
+
+  const checkDailyChallengeStatus = async () => {
+    try {
+      const completed = await isDailyChallengeCompleted();
+      setIsDailyChallengeCompletedToday(completed);
+      console.log('Daily challenge completion status:', completed);
+    } catch (error) {
+      console.error('Error checking daily challenge status:', error);
+      setIsDailyChallengeCompletedToday(false);
+    }
+  };
 
   const newGame = async () => {
     Alert.alert(
@@ -55,6 +74,16 @@ export default function MainMenu({ onStart }: MainMenuProps) {
     }
   };
 
+  const handleDailyChallenge = () => {
+    console.log('Daily Challenge button pressed');
+    onDailyChallenge();
+  };
+
+  const handleStore = () => {
+    console.log('Store button pressed');
+    onStore();
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.content}>
@@ -72,6 +101,22 @@ export default function MainMenu({ onStart }: MainMenuProps) {
             text="Continue"
             onPress={continueGame}
             style={styles.secondaryButton}
+          />
+          
+          <Button
+            text={isDailyChallengeCompletedToday ? "Daily Complete ✓" : "Daily Challenge"}
+            onPress={handleDailyChallenge}
+            style={[
+              styles.dailyButton,
+              isDailyChallengeCompletedToday && styles.completedDailyButton
+            ]}
+            textStyle={isDailyChallengeCompletedToday ? styles.completedDailyButtonText : undefined}
+          />
+
+          <Button
+            text="Store"
+            onPress={handleStore}
+            style={styles.storeButton}
           />
           
           <TouchableOpacity 
@@ -117,6 +162,14 @@ export default function MainMenu({ onStart }: MainMenuProps) {
               <Text style={styles.ruleHeader}>Help Options:</Text>
               <Text style={styles.ruleText}>• Hint = 50 pts (reveals first letter)</Text>
               <Text style={styles.ruleText}>• Answer = 200 pts (reveals full word)</Text>
+            </View>
+
+            <View style={styles.ruleSection}>
+              <Text style={styles.ruleHeader}>Daily Challenge:</Text>
+              <Text style={styles.ruleText}>• One special word per day</Text>
+              <Text style={styles.ruleText}>• 100 bonus points for completion</Text>
+              <Text style={styles.ruleText}>• No hints available (Premium feature)</Text>
+              <Text style={styles.ruleText}>• Leaderboard coming with Premium</Text>
             </View>
 
             <View style={styles.ruleSection}>
@@ -181,6 +234,21 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     backgroundColor: colors.secondary,
+    width: '100%',
+  },
+  dailyButton: {
+    backgroundColor: '#4a148c',
+    width: '100%',
+  },
+  completedDailyButton: {
+    backgroundColor: '#00e676',
+    opacity: 0.8,
+  },
+  completedDailyButtonText: {
+    color: '#ffffff',
+  },
+  storeButton: {
+    backgroundColor: '#FF6F00',
     width: '100%',
   },
   rulesButton: {

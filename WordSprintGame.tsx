@@ -18,6 +18,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { themes, wordBank } from "./wordBank";
 import SettingsPanel from "./components/SettingsPanel";
+import { updatePoints } from "./components/StoreScreen";
 import { colors } from "./styles/commonStyles";
 
 interface ConfirmationPopupProps {
@@ -135,9 +136,10 @@ function ConfirmationPopup({ visible, title, cost, currentPoints, onConfirm, onC
 
 interface WordSprintGameProps {
   onExit?: () => void;
+  onStore?: () => void;
 }
 
-export default function WordSprintGame({ onExit }: WordSprintGameProps) {
+export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps) {
   const { height } = useWindowDimensions();
   const [stage, setStage] = useState(0);
   const [level, setLevel] = useState(0);
@@ -371,25 +373,33 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
     }
   };
 
-  const handleHintConfirm = () => {
+  const handleHintConfirm = async () => {
     setShowHintPopup(false);
-    const np = points - 50;
-    setPoints(np);
-    save(stage, level, np);
-    Alert.alert("Hint", `First letter: ${word[0]}`);
-    console.log('Hint used - 50 points deducted');
+    try {
+      const newPoints = await updatePoints(-50);
+      setPoints(newPoints);
+      Alert.alert("Hint", `First letter: ${word[0]}`);
+      console.log('Hint used - 50 points deducted');
+    } catch (error) {
+      console.error('Error deducting points for hint:', error);
+      Alert.alert('Error', 'Failed to use hint. Please try again.');
+    }
   };
 
-  const handleAnswerConfirm = () => {
+  const handleAnswerConfirm = async () => {
     setShowAnswerPopup(false);
-    const np = points - 200;
-    setPoints(np);
-    save(stage, level, np);
-    Alert.alert("Answer", word);
-    console.log('Answer revealed - 200 points deducted');
-    setTimeout(() => {
-      next();
-    }, 1000);
+    try {
+      const newPoints = await updatePoints(-200);
+      setPoints(newPoints);
+      Alert.alert("Answer", word);
+      console.log('Answer revealed - 200 points deducted');
+      setTimeout(() => {
+        next();
+      }, 1000);
+    } catch (error) {
+      console.error('Error deducting points for answer:', error);
+      Alert.alert('Error', 'Failed to reveal answer. Please try again.');
+    }
   };
 
   const hint = () => {
@@ -412,6 +422,14 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
     }
     save(stage, level, points);
     onExit?.();
+  };
+
+  const handleStorePress = () => {
+    if (settings.sound) {
+      playClick();
+    }
+    save(stage, level, points);
+    onStore?.();
   };
 
   const handleSettingsPress = () => {
@@ -539,6 +557,11 @@ export default function WordSprintGame({ onExit }: WordSprintGameProps) {
         <Text style={styles.gameTitle}>WORD SPRINT</Text>
         
         <View style={styles.hudRight}>
+          {onStore && (
+            <TouchableOpacity style={styles.storeButton} onPress={handleStorePress}>
+              <Text style={styles.storeButtonText}>Store</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={styles.settingsButton} onPress={handleSettingsPress}>
             <Text style={styles.settingsButtonText}>⚙️</Text>
           </TouchableOpacity>
@@ -722,6 +745,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  storeButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(255,111,0,0.8)',
+    borderRadius: 4,
+  },
+  storeButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   settingsButton: {
     padding: 6,
