@@ -11,7 +11,6 @@ import {
   Modal,
   TouchableOpacity,
 } from 'react-native';
-import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Button from '../components/Button';
 import { colors, commonStyles } from '../styles/commonStyles';
@@ -45,9 +44,14 @@ interface ConfirmationPopupProps {
   onCancel: () => void;
 }
 
+interface WordSprintGameProps {
+  onExit?: () => void;
+}
+
 const STORAGE_KEYS = {
   GAME_STATE: 'word_sprint_game_state',
   POINTS: 'word_sprint_points',
+  PROGRESS: 'progress', // For compatibility with MainMenu
 };
 
 // Enhanced scramble function that ensures the result is always different from the original
@@ -134,7 +138,7 @@ function ConfirmationPopup({ visible, title, cost, currentPoints, onConfirm, onC
   );
 }
 
-export default function WordSprintGame() {
+export default function WordSprintGame({ onExit }: WordSprintGameProps) {
   const [gameState, setGameState] = useState<GameState>({
     currentStage: 0,
     currentLevel: 0,
@@ -178,9 +182,25 @@ export default function WordSprintGame() {
 
   const loadGameState = async () => {
     try {
+      // First try to load from the new progress format (MainMenu compatibility)
+      const progressData = await AsyncStorage.getItem(STORAGE_KEYS.PROGRESS);
+      if (progressData) {
+        const { stage, level, points } = JSON.parse(progressData);
+        console.log('Loaded progress from MainMenu format:', { stage, level, points });
+        setGameState(prev => ({
+          ...prev,
+          currentStage: stage,
+          currentLevel: level,
+          points: points,
+        }));
+        return;
+      }
+
+      // Fallback to old game state format
       const savedState = await AsyncStorage.getItem(STORAGE_KEYS.GAME_STATE);
       if (savedState) {
         const parsed = JSON.parse(savedState);
+        console.log('Loaded game state from old format:', parsed);
         setGameState({
           ...parsed,
           completedLevels: new Set(parsed.completedLevels || []),
@@ -193,14 +213,32 @@ export default function WordSprintGame() {
 
   const saveGameState = async () => {
     try {
+      // Save in both formats for compatibility
       const stateToSave = {
         ...gameState,
         completedLevels: Array.from(gameState.completedLevels),
       };
       await AsyncStorage.setItem(STORAGE_KEYS.GAME_STATE, JSON.stringify(stateToSave));
+      
+      // Also save in MainMenu compatible format
+      const progressData = {
+        stage: gameState.currentStage,
+        level: gameState.currentLevel,
+        points: gameState.points,
+      };
+      await AsyncStorage.setItem(STORAGE_KEYS.PROGRESS, JSON.stringify(progressData));
+      
+      console.log('Game state saved:', progressData);
     } catch (error) {
       console.log('Error saving game state:', error);
     }
+  };
+
+  const handleMenuPress = async () => {
+    // Save progress before exiting
+    await saveGameState();
+    console.log('Progress saved, returning to menu');
+    onExit?.();
   };
 
   const checkAnswer = () => {
@@ -372,18 +410,29 @@ export default function WordSprintGame() {
       <View style={commonStyles.container}>
         <Text style={commonStyles.title}>Game Complete!</Text>
         <Text style={styles.completionText}>
-          Congratulations! You've completed all {stages.length} stages!
+          Congratulations! You&apos;ve completed all {stages.length} stages!
         </Text>
         <Text style={styles.finalScore}>
           Final Score: {gameState.points} points
         </Text>
-        <Button text="Back to Home" onPress={() => router.back()} />
+        {onExit && (
+          <Button text="Back to Menu" onPress={onExit} />
+        )}
       </View>
     );
   }
 
   return (
     <ScrollView style={commonStyles.wrapper} contentContainerStyle={styles.container}>
+      {/* Menu Button */}
+      {onExit && (
+        <View style={styles.menuButtonContainer}>
+          <TouchableOpacity style={styles.menuButton} onPress={handleMenuPress}>
+            <Text style={styles.menuButtonText}>Menu</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Header Info */}
       <View style={styles.header}>
         <View style={styles.headerRow}>
@@ -465,12 +514,6 @@ export default function WordSprintGame() {
           onPress={purchaseHints}
           style={styles.purchaseButton}
         />
-
-        <Button
-          text="Back to Home"
-          onPress={() => router.back()}
-          style={styles.backButton}
-        />
       </View>
 
       {/* Confirmation Popups */}
@@ -499,6 +542,23 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: 20,
+  },
+  menuButtonContainer: {
+    alignItems: 'flex-end',
+    marginBottom: 10,
+  },
+  menuButton: {
+    backgroundColor: colors.backgroundAlt,
+    borderWidth: 1,
+    borderColor: colors.grey,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  menuButtonText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '600',
   },
   header: {
     backgroundColor: colors.backgroundAlt,
