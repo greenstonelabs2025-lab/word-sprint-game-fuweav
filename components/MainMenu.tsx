@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Button from './Button';
 import SettingsPanel from './SettingsPanel';
 import FeedbackModal from './FeedbackModal';
+import LevelDesigner from './LevelDesigner';
 import { colors, commonStyles } from '../styles/commonStyles';
 import { isDailyChallengeCompleted } from '../utils/dailyChallenge';
 
@@ -18,6 +19,7 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore }: MainMen
   const [rulesVisible, setRulesVisible] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showLevelDesigner, setShowLevelDesigner] = useState(false);
   const [isDailyChallengeCompletedToday, setIsDailyChallengeCompletedToday] = useState(false);
 
   useEffect(() => {
@@ -141,6 +143,13 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore }: MainMen
           >
             <Text style={styles.feedbackButtonText}>Feedback</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.levelDesignerButton}
+            onPress={() => setShowLevelDesigner(true)}
+          >
+            <Text style={styles.levelDesignerButtonText}>Level Designer</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -206,6 +215,12 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore }: MainMen
       <FeedbackModal 
         visible={showFeedback} 
         onClose={() => setShowFeedback(false)} 
+      />
+
+      {/* Level Designer */}
+      <LevelDesigner 
+        visible={showLevelDesigner} 
+        onClose={() => setShowLevelDesigner(false)} 
       />
     </View>
   );
@@ -293,6 +308,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.accent,
     textDecorationLine: 'underline',
+    textAlign: 'center',
+  },
+  levelDesignerButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  levelDesignerButtonText: {
+    fontSize: 14,
+    color: colors.grey,
     textAlign: 'center',
   },
   // Modal styles

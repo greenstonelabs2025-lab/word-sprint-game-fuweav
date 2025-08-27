@@ -9,6 +9,7 @@ import { commonStyles } from '../styles/commonStyles';
 import * as BillingService from '../billing/BillingService';
 import { initAnalytics } from '../src/analytics/AnalyticsService';
 import { submitPendingFeedback } from '../src/feedback/FeedbackService';
+import { initializeCache } from '../src/levelsync/SyncService';
 
 export default function MainScreen() {
   const [screen, setScreen] = useState<'menu' | 'game' | 'daily' | 'store'>('menu');
@@ -28,6 +29,10 @@ export default function MainScreen() {
         // Submit any pending feedback
         await submitPendingFeedback();
         console.log('Pending feedback submitted on app start');
+        
+        // Initialize word sets cache
+        await initializeCache();
+        console.log('Word sets cache initialized on app start');
       } catch (error) {
         console.error('Failed to initialize services on app start:', error);
       }
