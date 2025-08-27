@@ -12,10 +12,13 @@ import {
   Vibration,
   Alert,
   useWindowDimensions,
+  ScrollView,
+  FlatList,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../styles/commonStyles';
 import { LinearGradient } from 'expo-linear-gradient';
+import { supabase } from '../app/integrations/supabase/client';
 import {
   generateDailyWord,
   getTodayKey,
@@ -38,6 +41,18 @@ interface Settings {
 }
 
 interface PremiumModalProps {
+  visible: boolean;
+  onClose: () => void;
+}
+
+interface LeaderboardEntry {
+  id: string;
+  name: string;
+  score: number;
+  created_at: string;
+}
+
+interface LeaderboardModalProps {
   visible: boolean;
   onClose: () => void;
 }
@@ -81,6 +96,126 @@ function PremiumModal({ visible, onClose }: PremiumModalProps) {
   );
 }
 
+// Leaderboard Modal Component
+function LeaderboardModal({ visible, onClose }: LeaderboardModalProps) {
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible) {
+      fetchLeaderboard();
+    }
+  }, [visible]);
+
+  const fetchLeaderboard = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const todayKey = getTodayKey();
+      console.log('Fetching leaderboard for day:', todayKey);
+      
+      const { data, error: supabaseError } = await supabase
+        .from('daily_leaderboard')
+        .select('id, name, score, created_at')
+        .eq('day', todayKey)
+        .order('score', { ascending: false })
+        .order('created_at', { ascending: true })
+        .limit(50);
+
+      if (supabaseError) {
+        console.error('Supabase error fetching leaderboard:', supabaseError);
+        setError('Failed to load leaderboard');
+        return;
+      }
+
+      console.log('Leaderboard data fetched:', data);
+      setLeaderboard(data || []);
+    } catch (err) {
+      console.error('Error fetching leaderboard:', err);
+      setError('Failed to load leaderboard');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderLeaderboardItem = ({ item, index }: { item: LeaderboardEntry; index: number }) => (
+    <View style={styles.leaderboardItem}>
+      <View style={styles.rankContainer}>
+        <Text style={styles.rankText}>#{index + 1}</Text>
+      </View>
+      <View style={styles.nameContainer}>
+        <Text style={styles.nameText} numberOfLines={1}>
+          {item.name.length > 16 ? item.name.substring(0, 16) + '...' : item.name}
+        </Text>
+      </View>
+      <View style={styles.scoreContainer}>
+        <Text style={styles.scoreText}>{item.score}</Text>
+      </View>
+    </View>
+  );
+
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.leaderboardOverlay}>
+        <View style={styles.leaderboardModal}>
+          {/* Header */}
+          <View style={styles.leaderboardHeader}>
+            <Text style={styles.leaderboardTitle}>Today's Leaderboard</Text>
+            <TouchableOpacity style={styles.closeIconButton} onPress={onClose}>
+              <Text style={styles.closeIconText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Content */}
+          <View style={styles.leaderboardContent}>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>Loading...</Text>
+              </View>
+            ) : error ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+                <TouchableOpacity style={styles.retryButton} onPress={fetchLeaderboard}>
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : leaderboard.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No scores yet. Be first!</Text>
+              </View>
+            ) : (
+              <>
+                {/* Header row */}
+                <View style={styles.leaderboardHeaderRow}>
+                  <Text style={styles.headerRankText}>Rank</Text>
+                  <Text style={styles.headerNameText}>Name</Text>
+                  <Text style={styles.headerScoreText}>Score</Text>
+                </View>
+                
+                {/* Leaderboard list */}
+                <FlatList
+                  data={leaderboard}
+                  renderItem={renderLeaderboardItem}
+                  keyExtractor={(item) => item.id}
+                  style={styles.leaderboardList}
+                  showsVerticalScrollIndicator={false}
+                />
+              </>
+            )}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function DailyChallenge({ onExit }: DailyChallengeProps) {
   const { height } = useWindowDimensions();
   const [dailyWord, setDailyWord] = useState('');
@@ -90,7 +225,9 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
   const [isCompleted, setIsCompleted] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [isAdFree, setIsAdFree] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [settings, setSettings] = useState<Settings>({
     vibrate: true,
     reduceMotion: false,
@@ -227,6 +364,60 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
     setScrambledWord(scrambleDailyWord(dailyWord));
   };
 
+  const submitToLeaderboard = async () => {
+    if (isSubmitting) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      const todayKey = getTodayKey();
+      
+      // Check if already submitted today
+      const submittedKey = `daily_submitted_${todayKey}`;
+      const alreadySubmitted = await AsyncStorage.getItem(submittedKey);
+      
+      if (alreadySubmitted === 'true') {
+        console.log('Already submitted to leaderboard today');
+        return;
+      }
+      
+      // Get display name
+      const displayName = await AsyncStorage.getItem('pref_name') || 'Player';
+      
+      console.log('Submitting to leaderboard:', { day: todayKey, name: displayName, score: 100 });
+      
+      // Submit to Supabase with upsert (insert or update if exists)
+      const { error } = await supabase
+        .from('daily_leaderboard')
+        .upsert(
+          { day: todayKey, name: displayName, score: 100 },
+          { onConflict: 'day,name' }
+        );
+
+      if (error) {
+        console.error('Supabase error submitting score:', error);
+        // Don't block the user experience - show friendly message but continue
+        Alert.alert(
+          'Leaderboard Unavailable', 
+          'Your score couldn\'t be submitted to the leaderboard, but your progress has been saved locally.'
+        );
+      } else {
+        console.log('Score submitted to leaderboard successfully');
+        // Mark as submitted to prevent double submissions
+        await AsyncStorage.setItem(submittedKey, 'true');
+      }
+    } catch (error) {
+      console.error('Error submitting to leaderboard:', error);
+      // Don't block the user experience
+      Alert.alert(
+        'Leaderboard Unavailable', 
+        'Your score couldn\'t be submitted to the leaderboard, but your progress has been saved locally.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (isCompleted) return;
 
@@ -242,6 +433,9 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
         setPoints(newPoints);
         setIsCompleted(true);
         setShowSuccessModal(true);
+        
+        // Submit to leaderboard (non-blocking)
+        submitToLeaderboard();
         
         console.log('Daily challenge completed! 100 points awarded');
       } catch (error) {
@@ -316,14 +510,12 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
           <Text style={styles.completedText}>Come back tomorrow for a new challenge!</Text>
           
           <View style={styles.leaderboardContainer}>
-            <Text style={styles.leaderboardText}>
-              Your score will appear on tomorrow's leaderboard.
-            </Text>
-            {!isAdFree && (
-              <Text style={[styles.leaderboardNote, { color: 'rgba(255,255,255,0.6)' }]}>
-                Leaderboard requires Premium.
-              </Text>
-            )}
+            <TouchableOpacity
+              style={styles.viewLeaderboardButton}
+              onPress={() => setShowLeaderboardModal(true)}
+            >
+              <Text style={styles.viewLeaderboardButtonText}>View Leaderboard</Text>
+            </TouchableOpacity>
           </View>
           
           <TouchableOpacity
@@ -333,6 +525,12 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
             <Text style={styles.backButtonText}>Back to Menu</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Leaderboard Modal */}
+        <LeaderboardModal
+          visible={showLeaderboardModal}
+          onClose={() => setShowLeaderboardModal(false)}
+        />
       </View>
     );
   }
@@ -421,16 +619,14 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
           </View>
         )}
 
-        {/* Leaderboard Placeholder */}
+        {/* Leaderboard Button */}
         <View style={styles.leaderboardContainer}>
-          <Text style={styles.leaderboardText}>
-            Your score will appear on tomorrow's leaderboard.
-          </Text>
-          {!isAdFree && (
-            <Text style={[styles.leaderboardNote, { color: 'rgba(255,255,255,0.6)' }]}>
-              Leaderboard requires Premium.
-            </Text>
-          )}
+          <TouchableOpacity
+            style={styles.viewLeaderboardButton}
+            onPress={() => setShowLeaderboardModal(true)}
+          >
+            <Text style={styles.viewLeaderboardButtonText}>View Leaderboard</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -446,7 +642,7 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
             <Text style={styles.successModalTitle}>Congrats!</Text>
             <Text style={styles.successModalText}>You earned 100 bonus points.</Text>
             <Text style={styles.leaderboardText}>
-              Your score will appear on tomorrow's leaderboard.
+              Your score has been submitted to the leaderboard!
             </Text>
             <TouchableOpacity
               style={styles.confirmButton}
@@ -468,6 +664,12 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
           onClose={() => setShowPremiumModal(false)}
         />
       )}
+
+      {/* Leaderboard Modal */}
+      <LeaderboardModal
+        visible={showLeaderboardModal}
+        onClose={() => setShowLeaderboardModal(false)}
+      />
     </LinearGradient>
   );
 }
@@ -733,5 +935,175 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
+  },
+  // Leaderboard button styles
+  viewLeaderboardButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  viewLeaderboardButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  // Leaderboard modal styles
+  leaderboardOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  leaderboardModal: {
+    backgroundColor: colors.backgroundAlt,
+    borderRadius: 16,
+    margin: 20,
+    width: '90%',
+    maxHeight: '80%',
+    overflow: 'hidden',
+  },
+  leaderboardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.grey + '20',
+  },
+  leaderboardTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  closeIconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.grey + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeIconText: {
+    fontSize: 18,
+    color: colors.text,
+    fontWeight: 'bold',
+  },
+  leaderboardContent: {
+    flex: 1,
+    padding: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: colors.grey,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  errorText: {
+    fontSize: 16,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    color: colors.grey,
+    textAlign: 'center',
+  },
+  leaderboardHeaderRow: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: colors.accent,
+    marginBottom: 8,
+  },
+  headerRankText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: colors.text,
+    textAlign: 'center',
+  },
+  headerNameText: {
+    flex: 3,
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: colors.text,
+    textAlign: 'left',
+    paddingLeft: 8,
+  },
+  headerScoreText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: colors.text,
+    textAlign: 'center',
+  },
+  leaderboardList: {
+    flex: 1,
+  },
+  leaderboardItem: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.grey + '10',
+    alignItems: 'center',
+  },
+  rankContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  rankText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  nameContainer: {
+    flex: 3,
+    paddingLeft: 8,
+  },
+  nameText: {
+    fontSize: 16,
+    color: colors.text,
+  },
+  scoreContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  scoreText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.accent,
   },
 });

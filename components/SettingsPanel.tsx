@@ -10,7 +10,9 @@ import {
   ScrollView,
   Alert,
   useWindowDimensions,
+  TextInput,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../styles/commonStyles';
 import { Settings, loadSettings, saveSetting, resetProgress } from '../utils/settings';
 
@@ -27,6 +29,7 @@ export default function SettingsPanel({ visible, onClose }: SettingsPanelProps) 
     highContrast: false,
     sound: false,
   });
+  const [displayName, setDisplayName] = useState('Player');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showResetSuccess, setShowResetSuccess] = useState(false);
 
@@ -41,6 +44,10 @@ export default function SettingsPanel({ visible, onClose }: SettingsPanelProps) 
     try {
       const loadedSettings = await loadSettings();
       setSettings(loadedSettings);
+      
+      // Load display name
+      const savedName = await AsyncStorage.getItem('pref_name');
+      setDisplayName(savedName || 'Player');
     } catch (error) {
       console.error('Error loading settings in panel:', error);
     }
@@ -53,6 +60,16 @@ export default function SettingsPanel({ visible, onClose }: SettingsPanelProps) 
       console.log(`Setting ${key} updated to ${value}`);
     } catch (error) {
       console.error(`Error updating setting ${key}:`, error);
+    }
+  };
+
+  const updateDisplayName = async (name: string) => {
+    try {
+      await AsyncStorage.setItem('pref_name', name);
+      setDisplayName(name);
+      console.log('Display name updated to:', name);
+    } catch (error) {
+      console.error('Error updating display name:', error);
     }
   };
 
@@ -121,6 +138,23 @@ export default function SettingsPanel({ visible, onClose }: SettingsPanelProps) 
 
             {/* Content */}
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+              {/* Display Name Input */}
+              <View style={styles.inputSection}>
+                <Text style={styles.inputLabel}>Display name</Text>
+                <TextInput
+                  style={styles.nameInput}
+                  value={displayName}
+                  onChangeText={updateDisplayName}
+                  placeholder="Enter your name"
+                  placeholderTextColor={colors.grey}
+                  maxLength={20}
+                  autoCapitalize="words"
+                />
+                <Text style={styles.inputDescription}>
+                  This name will appear on the leaderboard.
+                </Text>
+              </View>
+
               {renderToggleRow(
                 'Vibrate on feedback',
                 'Buzz on errors and taps.',
@@ -363,5 +397,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.white,
+  },
+  // Display name input styles
+  inputSection: {
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.grey + '20',
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  nameInput: {
+    backgroundColor: colors.grey + '10',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.grey + '30',
+  },
+  inputDescription: {
+    fontSize: 12,
+    color: colors.grey,
+    marginTop: 4,
+    lineHeight: 16,
   },
 });
