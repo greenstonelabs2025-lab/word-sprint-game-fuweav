@@ -18,6 +18,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { themes, wordBank } from "./wordBank";
 import SettingsPanel from "./components/SettingsPanel";
 import FeedbackModal from "./components/FeedbackModal";
+import DebugPanel from "./components/DebugPanel";
 import GradientButton from "./src/ui/GradientButton";
 import { updatePoints } from "./components/StoreScreen";
 import { colors } from "./styles/commonStyles";
@@ -218,6 +219,8 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
   const [showHintPopup, setShowHintPopup] = useState(false);
   const [showAnswerPopup, setShowAnswerPopup] = useState(false);
   const [showGearMenu, setShowGearMenu] = useState(false);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [titleTapCount, setTitleTapCount] = useState(0);
 
   // Animation values
   const scaleWord = useRef(new Animated.Value(1)).current;
@@ -315,7 +318,16 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     try {
       const d = await AsyncStorage.getItem("progress");
       if (d) {
-        const { stage: s, level: l, points: p } = JSON.parse(d);
+        let { stage: s, level: l, points: p } = JSON.parse(d);
+        
+        // Add bounds check to prevent crashes if indexes shifted
+        if (s >= themes.length) {
+          console.log('Stage index out of bounds, resetting progress');
+          s = 0;
+          l = 0;
+          p = 0;
+        }
+        
         setStage(s);
         setLevel(l);
         setPoints(p);
@@ -777,6 +789,22 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     setShowGearMenu(false);
   };
 
+  const handleTitleTap = () => {
+    const newCount = titleTapCount + 1;
+    setTitleTapCount(newCount);
+    
+    // Reset count after 2 seconds
+    setTimeout(() => {
+      setTitleTapCount(0);
+    }, 2000);
+    
+    // Show debug panel after 5 taps
+    if (newCount >= 5) {
+      setShowDebugPanel(true);
+      setTitleTapCount(0);
+    }
+  };
+
   const createPressHandlers = (pressScale: Animated.Value) => ({
     onPressIn: () => {
       if (!settings.reduceMotion) {
@@ -805,6 +833,7 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     }
     
     const themeColors: { [key: string]: string } = {
+      Shapes: '#2E3A59',
       Animals: '#1b5e20',
       Food: '#6d4c41',
       Space: '#0d47a1',
@@ -1023,10 +1052,13 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
           )}
         </View>
         <View style={styles.hudCenter}>
-          <Text style={[
-            styles.hudTitle,
-            settings.highContrast && { color: "#fff" }
-          ]}>
+          <Text 
+            style={[
+              styles.hudTitle,
+              settings.highContrast && { color: "#fff" }
+            ]}
+            onPress={handleTitleTap}
+          >
             WORD SPRINT
           </Text>
         </View>
@@ -1238,6 +1270,12 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
         currentLevel={level}
         currentPoints={points}
         currentTheme={currentThemes[stage]}
+      />
+
+      {/* Debug Panel */}
+      <DebugPanel 
+        visible={showDebugPanel} 
+        onClose={() => setShowDebugPanel(false)} 
       />
     </View>
   );
