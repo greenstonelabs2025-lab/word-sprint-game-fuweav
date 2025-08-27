@@ -9,7 +9,9 @@ import {
   TouchableOpacity, 
   ScrollView, 
   Animated,
-  AccessibilityInfo
+  AccessibilityInfo,
+  ImageBackground,
+  Image
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,6 +26,7 @@ import { colors, commonStyles } from '../styles/commonStyles';
 import { isDailyChallengeCompleted } from '../utils/dailyChallenge';
 import { getCache } from '../src/levelsync/SyncService';
 import { loadSettings, Settings } from '../utils/settings';
+import * as Config from '../src/config/ConfigService';
 
 interface MainMenuProps {
   onStart: () => void;
@@ -31,8 +34,6 @@ interface MainMenuProps {
   onStore: () => void;
   onChallengeGame?: (challengeName: string, words: string[]) => void;
 }
-
-
 
 export default function MainMenu({ onStart, onDailyChallenge, onStore, onChallengeGame }: MainMenuProps) {
   const [rulesVisible, setRulesVisible] = useState(false);
@@ -43,6 +44,7 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore, onChallen
   const [isDailyChallengeCompletedToday, setIsDailyChallengeCompletedToday] = useState(false);
   const [hasChallenges, setHasChallenges] = useState(false);
   const [hasActiveDaily, setHasActiveDaily] = useState(false);
+  const [bgUrl, setBgUrl] = useState<string>("");
   const [settings, setSettings] = useState<Settings>({
     vibrate: true,
     reduceMotion: false,
@@ -54,7 +56,50 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore, onChallen
     loadUserSettings();
     checkDailyChallengeStatus();
     checkChallengesAvailable();
+    loadBackgroundImage();
   }, []);
+
+  const loadBackgroundImage = async () => {
+    try {
+      console.log('MainMenu: Loading background image...');
+      
+      // First load cached image
+      const cached = await Config.getCachedMenuBg();
+      if (cached) {
+        setBgUrl(cached);
+        console.log('MainMenu: Set cached background URL:', cached);
+      }
+      
+      // Then try to refresh with latest
+      const fresh = await Config.refreshMenuBg();
+      if (fresh && fresh !== cached) {
+        setBgUrl(fresh);
+        console.log('MainMenu: Updated to fresh background URL:', fresh);
+        
+        // Optionally prefetch for smoother display
+        if (fresh) {
+          Image.prefetch(fresh).catch(error => {
+            console.warn('MainMenu: Failed to prefetch background image:', error);
+          });
+        }
+      }
+    } catch (error) {
+      console.error('MainMenu: Error loading background image:', error);
+    }
+  };
+
+  const refreshBackground = async () => {
+    try {
+      console.log('MainMenu: Manual background refresh requested...');
+      const fresh = await Config.refreshMenuBg();
+      if (fresh) {
+        setBgUrl(fresh);
+        console.log('MainMenu: Background refreshed successfully:', fresh);
+      }
+    } catch (error) {
+      console.error('MainMenu: Error refreshing background:', error);
+    }
+  };
 
   const loadUserSettings = async () => {
     try {
@@ -145,8 +190,27 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore, onChallen
     onStore();
   };
 
-  return (
-    <View style={styles.container}>
+  // Determine background source based on high contrast setting
+  const getBackgroundSource = () => {
+    if (settings.highContrast) {
+      return null; // No background image in high contrast mode
+    }
+    
+    if (bgUrl) {
+      return { uri: bgUrl };
+    }
+    
+    // Fallback to a beautiful gradient-like image from Unsplash
+    return { uri: "https://images.unsplash.com/photo-1557683316-973673baf926?w=800&h=1200&fit=crop&crop=center&auto=format&q=80" };
+  };
+
+  const backgroundSource = getBackgroundSource();
+
+  const content = (
+    <>
+      {/* Overlay for better text readability (only if not high contrast) */}
+      {!settings.highContrast && <View style={styles.overlay} />}
+      
       <View style={styles.content}>
         {/* Header with emblem */}
         <View style={styles.header}>
@@ -226,8 +290,45 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore, onChallen
               style={styles.secondaryButtonPill}
             />
           </View>
+          
+          {/* Refresh background link */}
+          <TouchableOpacity onPress={refreshBackground} style={styles.refreshLink}>
+            <Text style={styles.refreshLinkText}>Refresh background</Text>
+          </TouchableOpacity>
         </View>
       </View>
+    </>
+  );
+
+  return (
+    <View style={styles.container}>
+      {settings.highContrast ? (
+        // High contrast mode: solid color background
+        <View style={[styles.container, { backgroundColor: '#101826' }]}>
+          {content}
+        </View>
+      ) : backgroundSource ? (
+        // Normal mode: image background with fallback
+        <ImageBackground
+          source={backgroundSource}
+          style={styles.bg}
+          resizeMode="cover"
+          onError={() => {
+            console.warn('MainMenu: Background image failed to load, clearing URL');
+            setBgUrl("");
+          }}
+        >
+          {content}
+        </ImageBackground>
+      ) : (
+        // Fallback: gradient background when no image is available
+        <LinearGradient
+          colors={['#1a1a2e', '#16213e', '#0f3460']}
+          style={styles.bg}
+        >
+          {content}
+        </LinearGradient>
+      )}
 
       {/* Rules Modal */}
       <Modal 
@@ -329,8 +430,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
+  bg: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.24)',
+  },
   content: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     maxWidth: 400,
     width: '100%',
   },
@@ -381,7 +493,16 @@ const styles = StyleSheet.create({
     minWidth: 120,
     maxWidth: 160,
   },
-
+  refreshLink: {
+    marginTop: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  refreshLinkText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    textDecorationLine: 'underline',
+  },
   highContrastTitle: {
     color: '#ffffff',
   },
