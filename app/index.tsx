@@ -8,6 +8,7 @@ import StoreScreen from '../components/StoreScreen';
 import { commonStyles } from '../styles/commonStyles';
 import * as BillingService from '../billing/BillingService';
 import { initAnalytics } from '../src/analytics/AnalyticsService';
+import { submitPendingFeedback } from '../src/feedback/FeedbackService';
 
 export default function MainScreen() {
   const [screen, setScreen] = useState<'menu' | 'game' | 'daily' | 'store'>('menu');
@@ -23,6 +24,10 @@ export default function MainScreen() {
         // Initialize analytics with app version
         await initAnalytics(undefined, '1.0.0');
         console.log('Analytics initialized on app start');
+        
+        // Submit any pending feedback
+        await submitPendingFeedback();
+        console.log('Pending feedback submitted on app start');
       } catch (error) {
         console.error('Failed to initialize services on app start:', error);
       }

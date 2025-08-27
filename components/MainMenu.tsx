@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, Alert, Modal, TouchableOpacity, ScrollView } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Button from './Button';
 import SettingsPanel from './SettingsPanel';
+import FeedbackModal from './FeedbackModal';
 import { colors, commonStyles } from '../styles/commonStyles';
 import { isDailyChallengeCompleted } from '../utils/dailyChallenge';
 
@@ -16,6 +17,7 @@ interface MainMenuProps {
 export default function MainMenu({ onStart, onDailyChallenge, onStore }: MainMenuProps) {
   const [rulesVisible, setRulesVisible] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const [isDailyChallengeCompletedToday, setIsDailyChallengeCompletedToday] = useState(false);
 
   useEffect(() => {
@@ -132,6 +134,13 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore }: MainMen
           >
             <Text style={styles.settingsButtonText}>Settings</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.feedbackButton}
+            onPress={() => setShowFeedback(true)}
+          >
+            <Text style={styles.feedbackButtonText}>Feedback</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -191,6 +200,12 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore }: MainMen
       <SettingsPanel 
         visible={showSettings} 
         onClose={() => setShowSettings(false)} 
+      />
+
+      {/* Feedback Modal */}
+      <FeedbackModal 
+        visible={showFeedback} 
+        onClose={() => setShowFeedback(false)} 
       />
     </View>
   );
@@ -268,6 +283,16 @@ const styles = StyleSheet.create({
   settingsButtonText: {
     fontSize: 14,
     color: colors.grey,
+    textAlign: 'center',
+  },
+  feedbackButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  feedbackButtonText: {
+    fontSize: 14,
+    color: colors.accent,
+    textDecorationLine: 'underline',
     textAlign: 'center',
   },
   // Modal styles

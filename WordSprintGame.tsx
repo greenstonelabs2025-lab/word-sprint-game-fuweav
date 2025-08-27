@@ -18,6 +18,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { themes, wordBank } from "./wordBank";
 import SettingsPanel from "./components/SettingsPanel";
+import FeedbackModal from "./components/FeedbackModal";
 import { updatePoints } from "./components/StoreScreen";
 import { colors } from "./styles/commonStyles";
 import { track } from "./src/analytics/AnalyticsService";
@@ -153,6 +154,11 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
   const [bannerText, setBannerText] = useState("");
   const [showStageComplete, setShowStageComplete] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackContext, setFeedbackContext] = useState<{
+    category?: 'Bug' | 'Idea' | 'Other';
+    message?: string;
+  }>({});
   const [settings, setSettings] = useState<Settings>({
     vibrate: true,
     reduceMotion: false,
@@ -163,6 +169,7 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
   // Popup states
   const [showHintPopup, setShowHintPopup] = useState(false);
   const [showAnswerPopup, setShowAnswerPopup] = useState(false);
+  const [showGearMenu, setShowGearMenu] = useState(false);
 
   // Animation values
   const scaleWord = useRef(new Animated.Value(1)).current;
@@ -391,6 +398,26 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
       animateWrong();
       setScrambled(scramble(word)); // Re-scramble on wrong answer
       console.log('Wrong answer - re-scrambling word');
+      
+      // Show alert with feedback option for wrong answers
+      Alert.alert(
+        "Try Again",
+        "That's not quite right. Keep trying!",
+        [
+          { text: "OK", style: "default" },
+          { 
+            text: "Report Bug", 
+            style: "default",
+            onPress: () => {
+              setFeedbackContext({
+                category: 'Bug',
+                message: `Context: Wrong answer on "${word}" (Stage ${stage + 1}, Level ${level + 1}, Theme: ${themes[stage]}). My guess was "${input}". `
+              });
+              setShowFeedback(true);
+            }
+          }
+        ]
+      );
     }
   };
 
@@ -479,7 +506,16 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     if (settings.sound) {
       playClick();
     }
-    setShowSettings(true);
+    setShowGearMenu(true);
+  };
+
+  const handleFeedbackPress = () => {
+    if (settings.sound) {
+      playClick();
+    }
+    setFeedbackContext({});
+    setShowFeedback(true);
+    setShowGearMenu(false);
   };
 
   const createPressHandlers = (pressScale: Animated.Value) => ({
@@ -742,6 +778,44 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
         onCancel={() => setShowAnswerPopup(false)}
       />
 
+      {/* Gear Menu Modal */}
+      <Modal
+        visible={showGearMenu}
+        transparent={true}
+        animationType={settings.reduceMotion ? 'none' : 'fade'}
+        onRequestClose={() => setShowGearMenu(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.gearMenuContent}>
+            <Text style={styles.gearMenuTitle}>Game Menu</Text>
+            
+            <TouchableOpacity
+              style={styles.gearMenuItem}
+              onPress={() => {
+                setShowGearMenu(false);
+                setShowSettings(true);
+              }}
+            >
+              <Text style={styles.gearMenuItemText}>⚙️ Settings</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.gearMenuItem}
+              onPress={handleFeedbackPress}
+            >
+              <Text style={styles.gearMenuItemText}>💬 Feedback</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.gearMenuItem, styles.gearMenuCancel]}
+              onPress={() => setShowGearMenu(false)}
+            >
+              <Text style={[styles.gearMenuItemText, styles.gearMenuCancelText]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Settings Panel */}
       <SettingsPanel 
         visible={showSettings} 
@@ -749,6 +823,21 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
           setShowSettings(false);
           loadSettings(); // Reload settings when panel closes
         }} 
+      />
+
+      {/* Feedback Modal */}
+      <FeedbackModal 
+        visible={showFeedback} 
+        onClose={() => {
+          setShowFeedback(false);
+          setFeedbackContext({});
+        }}
+        prefillCategory={feedbackContext.category}
+        prefillMessage={feedbackContext.message}
+        currentStage={stage}
+        currentLevel={level}
+        currentPoints={points}
+        currentTheme={themes[stage]}
       />
     </View>
   );
@@ -1046,5 +1135,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
+  },
+  // Gear menu styles
+  gearMenuContent: {
+    backgroundColor: colors.backgroundAlt,
+    borderRadius: 16,
+    padding: 20,
+    margin: 20,
+    minWidth: 200,
+    alignItems: 'center',
+  },
+  gearMenuTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  gearMenuItem: {
+    width: '100%',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+  },
+  gearMenuItemText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.text,
+  },
+  gearMenuCancel: {
+    backgroundColor: colors.grey + '40',
+    marginTop: 8,
+  },
+  gearMenuCancelText: {
+    color: colors.grey,
   },
 });
