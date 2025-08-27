@@ -73,12 +73,14 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
   const isTablet = width > 768;
 
   useEffect(() => {
+    console.log('LevelDesigner: visible changed to', visible);
     if (visible) {
       loadAdminStatus();
     }
   }, [visible]);
 
   useEffect(() => {
+    console.log('LevelDesigner: isAdmin changed to', isAdmin, 'visible:', visible);
     if (isAdmin && visible) {
       loadCache();
     }
@@ -129,11 +131,14 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
   }, [selectedTheme, selectedChallenge, cache, activeTab]);
 
   const loadAdminStatus = async () => {
+    console.log('LevelDesigner: Loading admin status...');
     try {
       const adminPref = await AsyncStorage.getItem('pref_admin');
-      setIsAdmin(adminPref === 'true');
+      const adminStatus = adminPref === 'true';
+      console.log('LevelDesigner: Admin status loaded:', adminStatus);
+      setIsAdmin(adminStatus);
     } catch (error) {
-      console.error('Failed to load admin status:', error);
+      console.error('LevelDesigner: Failed to load admin status:', error);
       setIsAdmin(false);
     } finally {
       setLoading(false);
@@ -141,20 +146,27 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
   };
 
   const enableAdmin = async () => {
+    console.log('LevelDesigner: Enabling admin mode...');
     try {
       await AsyncStorage.setItem('pref_admin', 'true');
       setIsAdmin(true);
+      console.log('LevelDesigner: Admin mode enabled');
     } catch (error) {
-      console.error('Failed to enable admin:', error);
+      console.error('LevelDesigner: Failed to enable admin:', error);
       Alert.alert('Error', 'Failed to enable admin mode');
     }
   };
 
   const loadCache = async () => {
+    console.log('LevelDesigner: Loading cache...');
     try {
       await initializeCache();
       await syncWordSets();
       const currentCache = await getCache();
+      console.log('LevelDesigner: Cache loaded:', {
+        themes: currentCache.themes.length,
+        challenges: currentCache.challenges.length
+      });
       setCache(currentCache);
       
       if (activeTab === 'stages' && currentCache.themes.length > 0 && !selectedTheme) {
@@ -163,7 +175,7 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
         setSelectedChallenge(currentCache.challenges[0].name);
       }
     } catch (error) {
-      console.error('Failed to load cache:', error);
+      console.error('LevelDesigner: Failed to load cache:', error);
     }
   };
 
@@ -206,6 +218,13 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
   const handleSave = async () => {
     const themeName = activeTab === 'stages' ? selectedTheme : selectedChallenge;
     
+    console.log('LevelDesigner: Attempting to save:', {
+      themeName,
+      activeTab,
+      currentKind,
+      wordsCount: words.filter(w => w.trim()).length
+    });
+    
     if (!themeName || themeName === 'NEW_THEME' || themeName === 'NEW_CHALLENGE') {
       Alert.alert('Error', 'Please select or create a theme/challenge');
       return;
@@ -231,6 +250,14 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
     setSaving(true);
     try {
       const cleanWords = words.map(word => word.trim().toLowerCase());
+      console.log('LevelDesigner: Saving with parameters:', {
+        themeName,
+        cleanWords: cleanWords.length,
+        currentKind,
+        activeFrom: currentKind === 'Challenge' ? activeFrom : undefined,
+        activeTo: currentKind === 'Challenge' ? activeTo : undefined
+      });
+      
       await saveTheme(
         themeName, 
         cleanWords, 
@@ -242,12 +269,10 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
       // Refresh cache
       await loadCache();
       
-      // Trigger a refresh of the main menu challenges
-      if (typeof onClose === 'function') {
-        // The parent component should refresh its challenge state
-      }
+      console.log('LevelDesigner: Save completed successfully');
     } catch (error) {
-      console.error('Save failed:', error);
+      console.error('LevelDesigner: Save failed:', error);
+      Alert.alert('Error', 'Failed to save. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -271,6 +296,7 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
           style: 'destructive',
           onPress: async () => {
             try {
+              console.log('LevelDesigner: Deleting:', themeName, currentKind);
               await deleteTheme(themeName, currentKind);
               if (activeTab === 'stages') {
                 setSelectedTheme(null);
@@ -279,7 +305,7 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
               }
               await loadCache();
             } catch (error) {
-              console.error('Delete failed:', error);
+              console.error('LevelDesigner: Delete failed:', error);
             }
           }
         }
@@ -390,6 +416,17 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
     return today >= activeFrom && today <= activeTo;
   };
 
+  console.log('LevelDesigner: Rendering with state:', {
+    visible,
+    loading,
+    isAdmin,
+    activeTab,
+    selectedTheme,
+    selectedChallenge,
+    cacheThemes: cache.themes.length,
+    cacheChallenges: cache.challenges.length
+  });
+
   if (loading) {
     return (
       <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
@@ -447,6 +484,7 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
           <TouchableOpacity
             style={[styles.tab, activeTab === 'stages' && styles.activeTab]}
             onPress={() => {
+              console.log('LevelDesigner: Switching to stages tab');
               setActiveTab('stages');
               setSelectedChallenge(null);
               if (cache.themes.length > 0) {
@@ -461,6 +499,7 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
           <TouchableOpacity
             style={[styles.tab, activeTab === 'challenges' && styles.activeTab]}
             onPress={() => {
+              console.log('LevelDesigner: Switching to challenges tab');
               setActiveTab('challenges');
               setSelectedTheme(null);
               if (cache.challenges.length > 0) {
@@ -491,61 +530,81 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
             
             <ScrollView style={styles.themeList}>
               {activeTab === 'stages' ? (
-                cache.themes.map((theme) => (
-                  <TouchableOpacity
-                    key={theme}
-                    style={[
-                      styles.themeItem,
-                      selectedTheme === theme && styles.themeItemSelected
-                    ]}
-                    onPress={() => setSelectedTheme(theme)}
-                  >
-                    <Text style={[
-                      styles.themeItemText,
-                      selectedTheme === theme && styles.themeItemTextSelected
-                    ]}>
-                      {theme}
-                    </Text>
-                    <Text style={styles.themeVersion}>
-                      v{cache.versions[theme] || 1}
-                    </Text>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                cache.challenges.map((challenge) => (
-                  <TouchableOpacity
-                    key={challenge.name}
-                    style={[
-                      styles.themeItem,
-                      selectedChallenge === challenge.name && styles.themeItemSelected
-                    ]}
-                    onPress={() => setSelectedChallenge(challenge.name)}
-                  >
-                    <View style={styles.challengeItemContent}>
+                cache.themes.length > 0 ? (
+                  cache.themes.map((theme) => (
+                    <TouchableOpacity
+                      key={theme}
+                      style={[
+                        styles.themeItem,
+                        selectedTheme === theme && styles.themeItemSelected
+                      ]}
+                      onPress={() => {
+                        console.log('LevelDesigner: Selected theme:', theme);
+                        setSelectedTheme(theme);
+                      }}
+                    >
                       <Text style={[
                         styles.themeItemText,
-                        selectedChallenge === challenge.name && styles.themeItemTextSelected
+                        selectedTheme === theme && styles.themeItemTextSelected
                       ]}>
-                        {challenge.name}
+                        {theme}
                       </Text>
-                      <View style={styles.challengeItemMeta}>
-                        <Text style={styles.themeVersion}>
-                          v{challenge.version}
+                      <Text style={styles.themeVersion}>
+                        v{cache.versions[theme] || 1}
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <View style={styles.emptyStateContainer}>
+                    <Text style={styles.emptyStateText}>No stage themes found</Text>
+                    <Text style={styles.emptyStateSubtext}>Create a new theme to get started</Text>
+                  </View>
+                )
+              ) : (
+                cache.challenges.length > 0 ? (
+                  cache.challenges.map((challenge) => (
+                    <TouchableOpacity
+                      key={challenge.name}
+                      style={[
+                        styles.themeItem,
+                        selectedChallenge === challenge.name && styles.themeItemSelected
+                      ]}
+                      onPress={() => {
+                        console.log('LevelDesigner: Selected challenge:', challenge.name);
+                        setSelectedChallenge(challenge.name);
+                      }}
+                    >
+                      <View style={styles.challengeItemContent}>
+                        <Text style={[
+                          styles.themeItemText,
+                          selectedChallenge === challenge.name && styles.themeItemTextSelected
+                        ]}>
+                          {challenge.name}
                         </Text>
-                        {challenge.active_from && challenge.active_to && (
-                          <View style={styles.challengeDateBadge}>
-                            <Text style={styles.challengeDateText}>
-                              {formatDate(challenge.active_from)} – {formatDate(challenge.active_to)}
-                            </Text>
-                            {!isDateActive(challenge.active_from, challenge.active_to) && (
-                              <Text style={styles.inactiveTag}>Inactive</Text>
-                            )}
-                          </View>
-                        )}
+                        <View style={styles.challengeItemMeta}>
+                          <Text style={styles.themeVersion}>
+                            v{challenge.version}
+                          </Text>
+                          {challenge.active_from && challenge.active_to && (
+                            <View style={styles.challengeDateBadge}>
+                              <Text style={styles.challengeDateText}>
+                                {formatDate(challenge.active_from)} – {formatDate(challenge.active_to)}
+                              </Text>
+                              {!isDateActive(challenge.active_from, challenge.active_to) && (
+                                <Text style={styles.inactiveTag}>Inactive</Text>
+                              )}
+                            </View>
+                          )}
+                        </View>
                       </View>
-                    </View>
-                  </TouchableOpacity>
-                ))
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <View style={styles.emptyStateContainer}>
+                    <Text style={styles.emptyStateText}>No challenges found</Text>
+                    <Text style={styles.emptyStateSubtext}>Create a new challenge to get started</Text>
+                  </View>
+                )
               )}
             </ScrollView>
           </View>
@@ -929,124 +988,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '600',
   },
-  // Challenge styles
-  challengesContainer: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  challengesScroll: {
-    flex: 1,
-  },
-  challengesContent: {
-    padding: 20,
-  },
-  challengeForm: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  formTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 20,
-  },
-  formRow: {
-    marginBottom: 16,
-  },
-  formLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  formInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: colors.text,
-    backgroundColor: colors.background,
-  },
-  dateContainer: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  dateField: {
-    flex: 1,
-  },
-  challengeWordsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 20,
-  },
-  challengeWordContainer: {
-    width: '48%',
-    minWidth: 120,
-  },
-  wordNumber: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginBottom: 4,
-  },
-  challengeWordInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 6,
-    padding: 8,
-    fontSize: 14,
-    color: colors.text,
-    backgroundColor: colors.background,
-  },
-  challengeErrorText: {
-    fontSize: 10,
-    color: colors.error,
-    marginTop: 2,
-  },
-  saveChallengeButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  saveChallengeButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  existingChallenges: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  existingChallengesTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 16,
-  },
-  challengeItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  challengeItemName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  challengeItemInfo: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
   // New styles for unified editor
   editorTitleContainer: {
     flexDirection: 'row',
@@ -1123,6 +1064,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingVertical: 2,
     borderRadius: 3,
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: colors.text,
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
 });
 
