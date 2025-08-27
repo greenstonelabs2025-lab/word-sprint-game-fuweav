@@ -14,7 +14,7 @@ const BUILD_PROFILES = {
 
 function showUsage() {
   console.log(`
-Usage: node scripts/build.js [build-type] [platform]
+Usage: node scripts/build.js [build-type] [platform] [options]
 
 Build Types:
   apk          - Build APK for production (default)
@@ -27,9 +27,12 @@ Platform:
   ios          - Build for iOS
   all          - Build for both platforms
 
+Options:
+  --clean      - Clean build cache and Gradle cache before building
+
 Examples:
   node scripts/build.js apk android
-  node scripts/build.js aab android
+  node scripts/build.js aab android --clean
   node scripts/build.js preview android
   node scripts/build.js play-console android
 `);
@@ -64,7 +67,26 @@ function cleanBuildCache() {
   }
 }
 
-function buildApp(buildType, platform) {
+function cleanGradleCache() {
+  console.log('🧹 Cleaning Gradle cache and stopping daemon...');
+  try {
+    // Stop Gradle daemon
+    execSync('./gradlew --stop', { stdio: 'inherit', cwd: './android' });
+    console.log('✅ Gradle daemon stopped');
+  } catch (error) {
+    console.warn('⚠️  Warning: Could not stop Gradle daemon (may not exist yet)');
+  }
+
+  try {
+    // Clean Gradle build
+    execSync('./gradlew clean', { stdio: 'inherit', cwd: './android' });
+    console.log('✅ Gradle clean completed');
+  } catch (error) {
+    console.warn('⚠️  Warning: Could not run Gradle clean (Android project may not exist yet)');
+  }
+}
+
+function buildApp(buildType, platform, shouldClean = false) {
   const profile = BUILD_PROFILES[buildType];
   if (!profile) {
     console.error(`❌ Invalid build type: ${buildType}`);
@@ -75,10 +97,27 @@ function buildApp(buildType, platform) {
   console.log(`🚀 Building ${buildType.toUpperCase()} for ${platform}...`);
   console.log(`📋 Using profile: ${profile}`);
 
+  if (shouldClean) {
+    cleanBuildCache();
+    // Note: Gradle clean will be done after prebuild generates the Android project
+  }
+
   const platformFlag = platform === 'all' ? '--platform all' : `--platform ${platform}`;
   const command = `eas build --profile ${profile} ${platformFlag} --non-interactive`;
 
   try {
+    // First run prebuild to generate Android project if needed
+    if (platform === 'android' || platform === 'all') {
+      console.log('📱 Generating Android project...');
+      execSync('expo prebuild --platform android', { stdio: 'inherit' });
+      
+      // Now clean Gradle if requested
+      if (shouldClean) {
+        cleanGradleCache();
+      }
+    }
+
+    // Run the actual build
     execSync(command, { stdio: 'inherit' });
     console.log(`✅ Build completed successfully!`);
     
@@ -89,6 +128,13 @@ function buildApp(buildType, platform) {
     }
   } catch (error) {
     console.error(`❌ Build failed with exit code: ${error.status}`);
+    
+    // Provide helpful debugging information
+    console.error('\n🔍 Debugging tips:');
+    console.error('1. Check if Java 17 is installed: java -version');
+    console.error('2. Try cleaning and rebuilding: node scripts/build.js apk android --clean');
+    console.error('3. Check EAS build logs for detailed error information');
+    
     process.exit(1);
   }
 }
@@ -103,16 +149,13 @@ function main() {
 
   const buildType = args[0] || 'apk';
   const platform = args[1] || 'android';
+  const shouldClean = args.includes('--clean');
 
   console.log('🔍 Validating environment...');
   validateEasInstallation();
   validateEasLogin();
 
-  if (args.includes('--clean')) {
-    cleanBuildCache();
-  }
-
-  buildApp(buildType, platform);
+  buildApp(buildType, platform, shouldClean);
 }
 
 if (require.main === module) {
