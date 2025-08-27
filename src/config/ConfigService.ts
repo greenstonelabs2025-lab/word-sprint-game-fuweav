@@ -2,7 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Hardcoded Supabase Storage URL for menu background
-const MENU_BG_URL = "https://jocffwplyqupgylasozz.supabase.co/storage/v1/object/public/assets/menu-bg-v1.jpg";
+const MENU_BG_URL = "https://jocffwplyqupgylasozz.supabase.co/storage/v1/object/public/Pictures/ChatGPT%20Image%20Aug%2027,%202025,%2008_11_26%20PM.png";
 const MENU_BG_CACHE_KEY = "menu_bg_url";
 
 /**

@@ -11,8 +11,11 @@ import {
   Animated,
   AccessibilityInfo,
   ImageBackground,
-  Image
+  Image,
+  Platform,
+  StatusBar
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -190,28 +193,28 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore, onChallen
     onStore();
   };
 
-  // Determine background source based on high contrast setting
-  const getBackgroundSource = () => {
-    if (settings.highContrast) {
-      return null; // No background image in high contrast mode
-    }
-    
-    if (bgUrl) {
-      return { uri: bgUrl };
-    }
-    
-    // Fallback to a beautiful gradient-like image from Unsplash
-    return { uri: "https://images.unsplash.com/photo-1557683316-973673baf926?w=800&h=1200&fit=crop&crop=center&auto=format&q=80" };
-  };
-
-  const backgroundSource = getBackgroundSource();
-
-  const content = (
-    <>
-      {/* Overlay for better text readability (only if not high contrast) */}
+  return (
+    <View style={{ flex: 1 }}>
+      {/* Background Image or High Contrast Background */}
+      {settings.highContrast ? (
+        <View style={[styles.bg, { backgroundColor: '#101826' }]} />
+      ) : (
+        <ImageBackground
+          source={bgUrl ? { uri: bgUrl } : { uri: "https://images.unsplash.com/photo-1557683316-973673baf926?w=800&h=1200&fit=crop&crop=center&auto=format&q=80" }}
+          style={styles.bg}
+          resizeMode="cover"
+          onError={() => {
+            console.warn('MainMenu: Background image failed to load, clearing URL');
+            setBgUrl("");
+          }}
+        />
+      )}
+      
+      {/* Overlay - only show if not high contrast */}
       {!settings.highContrast && <View style={styles.overlay} />}
       
-      <View style={styles.content}>
+      {/* Content with SafeAreaView */}
+      <SafeAreaView style={styles.content} edges={["top", "bottom"]}>
         {/* Header with emblem */}
         <View style={styles.header}>
           <View style={styles.emblem}>
@@ -296,39 +299,7 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore, onChallen
             <Text style={styles.refreshLinkText}>Refresh background</Text>
           </TouchableOpacity>
         </View>
-      </View>
-    </>
-  );
-
-  return (
-    <View style={styles.container}>
-      {settings.highContrast ? (
-        // High contrast mode: solid color background
-        <View style={[styles.container, { backgroundColor: '#101826' }]}>
-          {content}
-        </View>
-      ) : backgroundSource ? (
-        // Normal mode: image background with fallback
-        <ImageBackground
-          source={backgroundSource}
-          style={styles.bg}
-          resizeMode="cover"
-          onError={() => {
-            console.warn('MainMenu: Background image failed to load, clearing URL');
-            setBgUrl("");
-          }}
-        >
-          {content}
-        </ImageBackground>
-      ) : (
-        // Fallback: gradient background when no image is available
-        <LinearGradient
-          colors={['#1a1a2e', '#16213e', '#0f3460']}
-          style={styles.bg}
-        >
-          {content}
-        </LinearGradient>
-      )}
+      </SafeAreaView>
 
       {/* Rules Modal */}
       <Modal 
@@ -423,17 +394,8 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore, onChallen
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
   bg: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
+    ...StyleSheet.absoluteFillObject,
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
@@ -443,12 +405,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    maxWidth: 400,
-    width: '100%',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0,
   },
   header: {
     alignItems: 'center',
     marginBottom: 40,
+    width: '100%',
   },
   emblem: {
     width: 36,
@@ -478,6 +441,7 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     width: '100%',
+    maxWidth: 400,
     alignItems: 'center',
     gap: 16,
   },
