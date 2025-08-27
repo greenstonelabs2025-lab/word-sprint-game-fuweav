@@ -11,6 +11,7 @@ import {
   Platform,
   ScrollView,
   useWindowDimensions,
+  SafeAreaView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../app/integrations/supabase/client';
@@ -261,163 +262,169 @@ export default function FeedbackModal({
     <Modal
       visible={visible}
       animationType={settings.reduceMotion ? 'none' : 'slide'}
-      presentationStyle="pageSheet"
+      transparent={false}
       onRequestClose={handleClose}
     >
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ScrollView 
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={[styles.title, settings.highContrast && styles.highContrastText]}>
-              Send Feedback
-            </Text>
-            <TouchableOpacity
-              style={[styles.closeButton, settings.highContrast && styles.highContrastBorder]}
-              onPress={() => {
-                triggerHaptic("light");
-                handleClose();
-              }}
-              disabled={isSubmitting}
-            >
-              <Text style={[styles.closeButtonText, settings.highContrast && styles.highContrastText]}>
-                ✕
+      <SafeAreaView style={styles.modalContainer}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <ScrollView 
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={[styles.title, settings.highContrast && styles.highContrastText]}>
+                Send Feedback
               </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Category Picker */}
-          <View style={styles.section}>
-            <Text style={[styles.label, settings.highContrast && styles.highContrastText]}>
-              Category
-            </Text>
-            <View style={styles.categoryContainer}>
-              {CATEGORIES.map((cat) => (
-                <TouchableOpacity
-                  key={cat}
-                  style={[
-                    styles.categoryButton,
-                    category === cat && styles.categoryButtonSelected,
-                    settings.highContrast && styles.highContrastBorder,
-                    settings.highContrast && category === cat && styles.highContrastSelected,
-                  ]}
-                  onPress={() => {
-                    triggerHaptic("light");
-                    setCategory(cat);
-                  }}
-                  disabled={isSubmitting}
-                >
-                  <Text
-                    style={[
-                      styles.categoryButtonText,
-                      category === cat && styles.categoryButtonTextSelected,
-                      settings.highContrast && styles.highContrastText,
-                    ]}
-                  >
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              <TouchableOpacity
+                style={[styles.closeButton, settings.highContrast && styles.highContrastBorder]}
+                onPress={() => {
+                  triggerHaptic("light");
+                  handleClose();
+                }}
+                disabled={isSubmitting}
+              >
+                <Text style={[styles.closeButtonText, settings.highContrast && styles.highContrastText]}>
+                  ✕
+                </Text>
+              </TouchableOpacity>
             </View>
-          </View>
 
-          {/* Message Input */}
-          <View style={styles.section}>
-            <View style={styles.labelRow}>
+            {/* Category Picker */}
+            <View style={styles.section}>
               <Text style={[styles.label, settings.highContrast && styles.highContrastText]}>
-                Message
+                Category
               </Text>
-              <Text style={[styles.characterCount, { color: characterCountColor }]}>
-                {characterCount}/{MIN_MESSAGE_LENGTH} min
-              </Text>
+              <View style={styles.categoryContainer}>
+                {CATEGORIES.map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[
+                      styles.categoryButton,
+                      category === cat && styles.categoryButtonSelected,
+                      settings.highContrast && styles.highContrastBorder,
+                      settings.highContrast && category === cat && styles.highContrastSelected,
+                    ]}
+                    onPress={() => {
+                      triggerHaptic("light");
+                      setCategory(cat);
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryButtonText,
+                        category === cat && styles.categoryButtonTextSelected,
+                        settings.highContrast && styles.highContrastText,
+                      ]}
+                    >
+                      {cat}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-            <TextInput
-              style={[
-                styles.messageInput,
-                settings.highContrast && styles.highContrastInput,
-              ]}
-              value={message}
-              onChangeText={setMessage}
-              placeholder="Describe your bug report or idea..."
-              placeholderTextColor={settings.highContrast ? '#888' : colors.grey}
-              multiline
-              numberOfLines={6}
-              textAlignVertical="top"
-              editable={!isSubmitting}
-            />
-          </View>
 
-          {/* Game Info Chips */}
-          <View style={styles.section}>
-            <Text style={[styles.label, settings.highContrast && styles.highContrastText]}>
-              Game Context (Auto-filled)
-            </Text>
-            <View style={styles.chipsContainer}>
-              <View style={[styles.chip, settings.highContrast && styles.highContrastChip]}>
-                <Text style={[styles.chipText, settings.highContrast && styles.highContrastText]}>
-                  Stage {gameData.stage + 1}
+            {/* Message Input */}
+            <View style={styles.section}>
+              <View style={styles.labelRow}>
+                <Text style={[styles.label, settings.highContrast && styles.highContrastText]}>
+                  Message
+                </Text>
+                <Text style={[styles.characterCount, { color: characterCountColor }]}>
+                  {characterCount}/{MIN_MESSAGE_LENGTH} min
                 </Text>
               </View>
-              <View style={[styles.chip, settings.highContrast && styles.highContrastChip]}>
-                <Text style={[styles.chipText, settings.highContrast && styles.highContrastText]}>
-                  Level {gameData.level + 1}
-                </Text>
-              </View>
-              <View style={[styles.chip, settings.highContrast && styles.highContrastChip]}>
-                <Text style={[styles.chipText, settings.highContrast && styles.highContrastText]}>
-                  {gameData.points} pts
-                </Text>
-              </View>
-              {currentTheme && (
+              <TextInput
+                style={[
+                  styles.messageInput,
+                  settings.highContrast && styles.highContrastInput,
+                ]}
+                value={message}
+                onChangeText={setMessage}
+                placeholder="Describe your bug report or idea..."
+                placeholderTextColor={settings.highContrast ? '#888' : colors.grey}
+                multiline
+                numberOfLines={6}
+                textAlignVertical="top"
+                editable={!isSubmitting}
+              />
+            </View>
+
+            {/* Game Info Chips */}
+            <View style={styles.section}>
+              <Text style={[styles.label, settings.highContrast && styles.highContrastText]}>
+                Game Context (Auto-filled)
+              </Text>
+              <View style={styles.chipsContainer}>
                 <View style={[styles.chip, settings.highContrast && styles.highContrastChip]}>
                   <Text style={[styles.chipText, settings.highContrast && styles.highContrastText]}>
-                    {currentTheme}
+                    Stage {gameData.stage + 1}
                   </Text>
                 </View>
-              )}
-              <View style={[styles.chip, settings.highContrast && styles.highContrastChip]}>
-                <Text style={[styles.chipText, settings.highContrast && styles.highContrastText]}>
-                  v{APP_VERSION}
-                </Text>
+                <View style={[styles.chip, settings.highContrast && styles.highContrastChip]}>
+                  <Text style={[styles.chipText, settings.highContrast && styles.highContrastText]}>
+                    Level {gameData.level + 1}
+                  </Text>
+                </View>
+                <View style={[styles.chip, settings.highContrast && styles.highContrastChip]}>
+                  <Text style={[styles.chipText, settings.highContrast && styles.highContrastText]}>
+                    {gameData.points} pts
+                  </Text>
+                </View>
+                {currentTheme && (
+                  <View style={[styles.chip, settings.highContrast && styles.highContrastChip]}>
+                    <Text style={[styles.chipText, settings.highContrast && styles.highContrastText]}>
+                      {currentTheme}
+                    </Text>
+                  </View>
+                )}
+                <View style={[styles.chip, settings.highContrast && styles.highContrastChip]}>
+                  <Text style={[styles.chipText, settings.highContrast && styles.highContrastText]}>
+                    v{APP_VERSION}
+                  </Text>
+                </View>
               </View>
             </View>
-          </View>
 
-          {/* Action Buttons */}
-          <View style={styles.buttonContainer}>
-            <GradientButton
-              title="Cancel"
-              icon="✖️"
-              onPress={handleClose}
-              colors={[colors.grey + '60', colors.grey + '40']}
-              disabled={isSubmitting}
-              style={styles.button}
-            />
+            {/* Action Buttons */}
+            <View style={styles.buttonContainer}>
+              <GradientButton
+                title="Cancel"
+                icon="✖️"
+                onPress={handleClose}
+                colors={[colors.grey + '60', colors.grey + '40']}
+                disabled={isSubmitting}
+                style={styles.button}
+              />
 
-            <GradientButton
-              title={isSubmitting ? 'Sending...' : 'Send'}
-              icon={isSubmitting ? undefined : '📤'}
-              onPress={submitFeedback}
-              colors={isSubmitDisabled ? [colors.grey + '40', colors.grey + '20'] : ['#60A5FA', '#2563EB']}
-              disabled={isSubmitDisabled}
-              style={styles.button}
-            />
-          </View>
-        </ScrollView>
-      </View>
+              <GradientButton
+                title={isSubmitting ? 'Sending...' : 'Send'}
+                icon={isSubmitting ? undefined : '📤'}
+                onPress={submitFeedback}
+                colors={isSubmitDisabled ? [colors.grey + '40', colors.grey + '20'] : ['#60A5FA', '#2563EB']}
+                disabled={isSubmitDisabled}
+                style={styles.button}
+              />
+            </View>
+          </ScrollView>
+        </View>
+      </SafeAreaView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  modalContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   container: {
     flex: 1,
   },
   scrollContent: {
     padding: 20,
-    paddingTop: 60, // Account for status bar
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
@@ -494,7 +501,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     minHeight: 120,
     borderWidth: 1,
-    borderColor: 'transparent',
+    borderColor: colors.border,
   },
   chipsContainer: {
     flexDirection: 'row',
@@ -507,7 +514,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.grey + '40',
+    borderColor: colors.border,
   },
   chipText: {
     fontSize: 12,
