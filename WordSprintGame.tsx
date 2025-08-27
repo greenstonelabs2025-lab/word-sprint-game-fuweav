@@ -37,15 +37,6 @@ console.log("All themes:", themes);
 console.log("Shapes words available:", wordBank["Shapes"]?.length || 0);
 console.log("========================");
 
-interface ConfirmationPopupProps {
-  visible: boolean;
-  title: string;
-  cost: number;
-  currentPoints: number;
-  onConfirm: () => void;
-  onCancel: () => void;
-}
-
 interface Settings {
   vibrate: boolean;
   reduceMotion: boolean;
@@ -139,50 +130,6 @@ const playSuccess = () => {
   console.log('Success sound would play here');
 };
 
-// Confirmation Popup Component
-function ConfirmationPopup({ visible, title, cost, currentPoints, onConfirm, onCancel }: ConfirmationPopupProps) {
-  const hasEnoughPoints = currentPoints >= cost;
-  
-  return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={onCancel}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Spend Points?</Text>
-          <Text style={styles.modalSubtitle}>{title}</Text>
-          <Text style={styles.modalCost}>{cost} points</Text>
-          <Text style={styles.modalPoints}>You have {currentPoints} points</Text>
-          
-          {!hasEnoughPoints && (
-            <Text style={styles.modalWarning}>Not enough points</Text>
-          )}
-          
-          <View style={styles.modalButtons}>
-            <GradientButton
-              title="Cancel"
-              onPress={onCancel}
-              colors={[colors.grey + '60', colors.grey + '40']}
-              style={styles.modalButton}
-            />
-            
-            <GradientButton
-              title="Confirm"
-              onPress={hasEnoughPoints ? onConfirm : onCancel}
-              colors={hasEnoughPoints ? [colors.accent, colors.primary] : [colors.grey + '40', colors.grey + '20']}
-              disabled={!hasEnoughPoints}
-              style={styles.modalButton}
-            />
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 interface WordSprintGameProps {
   onExit?: () => void;
   onStore?: () => void;
@@ -228,8 +175,6 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
   const [showSyncRequired, setShowSyncRequired] = useState(false);
   
   // Popup states
-  const [showHintPopup, setShowHintPopup] = useState(false);
-  const [showAnswerPopup, setShowAnswerPopup] = useState(false);
   const [showGearMenu, setShowGearMenu] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [titleTapCount, setTitleTapCount] = useState(0);
@@ -399,7 +344,7 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     return word;
   };
 
-  const save = async (s: number, l: number, p: number) => {
+  const saveProgress = async (s: number, l: number, p: number) => {
     try {
       await AsyncStorage.setItem("progress", JSON.stringify({ stage: s, level: l, points: p }));
     } catch (e) {
@@ -562,7 +507,7 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     }, 800);
   };
 
-  const next = () => {
+  const nextWord = () => {
     let l = level + 1, s = stage;
     
     if (l >= 15) {
@@ -576,7 +521,7 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     setLevel(l);
     setWord(w);
     setScrambled(scramble(w));
-    save(s, l, points);
+    saveProgress(s, l, points);
     animateStageTransition();
     console.log(`Moved to stage ${s + 1}, level ${l + 1}: ${w}`);
   };
@@ -596,7 +541,7 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     setWord(w);
     setScrambled(scramble(w));
     setShowStageComplete(false);
-    save(s, l, points);
+    saveProgress(s, l, points);
     animateStageTransition();
     console.log(`Advanced to stage ${s + 1}, level ${l + 1}: ${w}`);
   };
@@ -633,10 +578,10 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
       
       animateCorrect();
       showSuccessBanner(`Correct! +${gain} pts`);
-      save(stage, level, np);
+      saveProgress(stage, level, np);
       
       setTimeout(() => {
-        next();
+        nextWord();
       }, 800);
     } else {
       setStreak(0);
@@ -685,119 +630,109 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     }
   };
 
-  const handleHintConfirm = async () => {
-    setShowHintPopup(false);
-    try {
-      const newPoints = await updatePoints(-50);
-      setPoints(newPoints);
+  // Instant hint function - no popups
+  const buyHint = () => {
+    if (points < 50) return; // Do nothing if insufficient points
+    
+    const newPoints = points - 50;
+    setPoints(newPoints);
+    saveProgress(stage, level, newPoints);
+    
+    // Track hint purchase
+    track("hint_buy", {
+      cost: 50,
+      points: newPoints,
+      stage: stage + 1,
+      level: level + 1,
+      theme: themes[stage],
+      word: word.toLowerCase()
+    });
+    
+    // Auto-place the next correct letter
+    const targetWord = word.toLowerCase();
+    const nextPosition = currentGuess.length;
+    
+    if (nextPosition < targetWord.length) {
+      const nextLetter = targetWord[nextPosition].toUpperCase();
       
-      // Track hint purchase
-      track("hint_buy", {
-        cost: 50,
-        points: newPoints,
-        stage: stage + 1,
-        level: level + 1,
-        theme: themes[stage],
-        word: word.toLowerCase()
-      });
+      // Find the first available tile with this letter
+      const availableTileIndex = letterTiles.findIndex(tile => 
+        tile.letter === nextLetter && !tile.disabled
+      );
       
-      // Auto-place the next correct letter
-      const targetWord = word.toLowerCase();
-      const nextPosition = currentGuess.length;
-      
-      if (nextPosition < targetWord.length) {
-        const nextLetter = targetWord[nextPosition].toUpperCase();
-        
-        // Find the first available tile with this letter
-        const availableTileIndex = letterTiles.findIndex(tile => 
-          tile.letter === nextLetter && !tile.disabled
-        );
-        
-        if (availableTileIndex !== -1) {
-          // Auto-tap this tile
-          handleLetterTap(availableTileIndex);
-          console.log('Hint used - auto-placed letter:', nextLetter);
-        } else {
-          Alert.alert("Hint", `Next letter: ${nextLetter}`);
-        }
+      if (availableTileIndex !== -1) {
+        // Auto-tap this tile
+        handleLetterTap(availableTileIndex);
+        console.log('Hint used - auto-placed letter:', nextLetter);
       }
-      
-    } catch (error) {
-      console.error('Error deducting points for hint:', error);
-      Alert.alert('Error', 'Failed to use hint. Please try again.');
     }
   };
 
-  const handleAnswerConfirm = async () => {
-    setShowAnswerPopup(false);
-    try {
-      const newPoints = await updatePoints(-200);
-      setPoints(newPoints);
+  // Instant answer function - no popups
+  const buyAnswer = () => {
+    if (points < 200) return; // Do nothing if insufficient points
+    
+    const newPoints = points - 200;
+    setPoints(newPoints);
+    saveProgress(stage, level, newPoints);
+    
+    // Track answer purchase
+    track("answer_buy", {
+      cost: 200,
+      points: newPoints,
+      stage: stage + 1,
+      level: level + 1,
+      theme: themes[stage],
+      word: word.toLowerCase()
+    });
+    
+    // Auto-complete the word instantly
+    const targetWord = word.toLowerCase();
+    const remainingLetters = targetWord.slice(currentGuess.length);
+    
+    // Clear current guess and fill with complete word
+    setCurrentGuess([]);
+    setGuessHistory([]);
+    setLetterTiles(prev => prev.map(t => ({ ...t, disabled: false })));
+    
+    // Fill the complete word
+    setTimeout(() => {
+      const completeWord = targetWord.split('');
+      const newGuess: string[] = [];
+      const newHistory: number[] = [];
       
-      // Track answer purchase
-      track("answer_buy", {
-        cost: 200,
-        points: newPoints,
-        stage: stage + 1,
-        level: level + 1,
-        theme: themes[stage],
-        word: word.toLowerCase()
-      });
-      
-      // Fill all remaining letters instantly
-      const targetWord = word.toLowerCase();
-      const remainingLetters = targetWord.slice(currentGuess.length);
-      
-      for (const letter of remainingLetters) {
+      for (const letter of completeWord) {
         const availableTileIndex = letterTiles.findIndex(tile => 
-          tile.letter === letter.toUpperCase() && !tile.disabled
+          tile.letter === letter.toUpperCase() && !newHistory.includes(tile.index)
         );
         
         if (availableTileIndex !== -1) {
-          // Add to guess without animation
-          setCurrentGuess(prev => [...prev, letter.toUpperCase()]);
-          setGuessHistory(prev => [...prev, availableTileIndex]);
-          setLetterTiles(prev => prev.map((t, i) => 
-            i === availableTileIndex ? { ...t, disabled: true } : t
-          ));
+          newGuess.push(letter.toUpperCase());
+          newHistory.push(availableTileIndex);
         }
       }
       
-      console.log('Answer revealed - auto-filled word');
+      setCurrentGuess(newGuess);
+      setGuessHistory(newHistory);
+      setLetterTiles(prev => prev.map((t, i) => ({
+        ...t,
+        disabled: newHistory.includes(i)
+      })));
       
-      // Show success and move to next
+      console.log('Answer revealed - auto-completed word');
+      
+      // Trigger nextWord after a brief delay
       setTimeout(() => {
-        showSuccessBanner("Answer revealed!");
-        setTimeout(() => {
-          next();
-        }, 800);
+        nextWord();
       }, 500);
-      
-    } catch (error) {
-      console.error('Error deducting points for answer:', error);
-      Alert.alert('Error', 'Failed to reveal answer. Please try again.');
-    }
-  };
-
-  const hint = () => {
-    if (settings.sound) {
-      playClick();
-    }
-    setShowHintPopup(true);
-  };
-
-  const answer = () => {
-    if (settings.sound) {
-      playClick();
-    }
-    setShowAnswerPopup(true);
+    }, 100);
   };
 
   const handleMenuPress = () => {
     if (settings.sound) {
       playClick();
     }
-    save(stage, level, points);
+    saveProgress(stage, level, points);
     onExit?.();
   };
 
@@ -805,7 +740,7 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     if (settings.sound) {
       playClick();
     }
-    save(stage, level, points);
+    saveProgress(stage, level, points);
     onStore?.();
   };
 
@@ -1169,21 +1104,27 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
             colors={["#00E676", "#00B248"]}
           />
           
-          <GradientButton
-            title={points >= 50 ? 'Hint (50)' : 'Need 50 pts'}
-            icon="💡"
-            onPress={hint}
-            colors={["#FFD54F", "#FFA000"]}
-            disabled={points < 50}
-          />
+          <View style={styles.buttonWithCaption}>
+            <GradientButton
+              title="Hint"
+              icon="💡"
+              onPress={buyHint}
+              colors={["#FFD54F", "#FFA000"]}
+              disabled={points < 50}
+            />
+            <Text style={styles.buttonCaption}>Costs 50 pts</Text>
+          </View>
           
-          <GradientButton
-            title={points >= 200 ? 'Answer (200)' : 'Need 200 pts'}
-            icon="🔑"
-            onPress={answer}
-            colors={["#FF8A80", "#E53935"]}
-            disabled={points < 200}
-          />
+          <View style={styles.buttonWithCaption}>
+            <GradientButton
+              title="Answer"
+              icon="🔑"
+              onPress={buyAnswer}
+              colors={["#FF8A80", "#E53935"]}
+              disabled={points < 200}
+            />
+            <Text style={styles.buttonCaption}>Costs 200 pts</Text>
+          </View>
         </View>
       </ScrollView>
 
@@ -1220,25 +1161,6 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
           </View>
         </View>
       </Modal>
-
-      {/* Confirmation Popups */}
-      <ConfirmationPopup
-        visible={showHintPopup}
-        title="Hint"
-        cost={50}
-        currentPoints={points}
-        onConfirm={handleHintConfirm}
-        onCancel={() => setShowHintPopup(false)}
-      />
-
-      <ConfirmationPopup
-        visible={showAnswerPopup}
-        title="Answer"
-        cost={200}
-        currentPoints={points}
-        onConfirm={handleAnswerConfirm}
-        onCancel={() => setShowAnswerPopup(false)}
-      />
 
       {/* Gear Menu Modal */}
       <Modal
@@ -1529,6 +1451,16 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 300,
     gap: 12,
+  },
+  // Button with caption styles
+  buttonWithCaption: {
+    alignItems: 'center',
+  },
+  buttonCaption: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 4,
+    textAlign: 'center',
   },
   // Modal styles
   modalOverlay: {
