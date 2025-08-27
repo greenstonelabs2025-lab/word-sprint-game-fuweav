@@ -10,10 +10,10 @@ import { commonStyles } from '../styles/commonStyles';
 import * as BillingService from '../billing/BillingService';
 import { initAnalytics } from '../src/analytics/AnalyticsService';
 import { submitPendingFeedback } from '../src/feedback/FeedbackService';
-import { initializeCache, syncChallenges } from '../src/levelsync/SyncService';
+import { initializeCache, syncWordSets } from '../src/levelsync/SyncService';
 
 export default function MainScreen() {
-  const [screen, setScreen] = useState<'menu' | 'game' | 'daily' | 'store' | 'challenge'>('menu');
+  const [screen, setScreen] = useState<'menu' | 'game' | 'daily' | 'store' | 'challenges' | 'challengeGame'>('menu');
   const [challengeData, setChallengeData] = useState<{ name: string; words: string[] } | null>(null);
 
   useEffect(() => {
@@ -36,9 +36,9 @@ export default function MainScreen() {
         await initializeCache();
         console.log('Word sets cache initialized on app start');
         
-        // Sync challenges
-        await syncChallenges();
-        console.log('Challenges synced on app start');
+        // Sync word sets and challenges
+        await syncWordSets();
+        console.log('Word sets and challenges synced on app start');
       } catch (error) {
         console.error('Failed to initialize services on app start:', error);
       }
@@ -58,7 +58,7 @@ export default function MainScreen() {
           onStore={() => setScreen('store')}
           onChallengeGame={(challengeName, words) => {
             setChallengeData({ name: challengeName, words });
-            setScreen('challenge');
+            setScreen('challengeGame');
           }}
         />
       </View>
@@ -81,7 +81,7 @@ export default function MainScreen() {
     );
   }
 
-  if (screen === 'challenge' && challengeData) {
+  if (screen === 'challengeGame' && challengeData) {
     return (
       <View style={commonStyles.wrapper}>
         <ChallengeGame 

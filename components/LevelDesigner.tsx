@@ -10,18 +10,18 @@ import {
   ScrollView,
   Alert,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
 import { colors } from '../styles/commonStyles';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { 
   getCache, 
   saveTheme, 
   deleteTheme, 
   syncWordSets,
   initializeCache,
-  getChallengesCache,
-  syncChallenges,
-  saveChallenge
+  getChallengesCache
 } from '../src/levelsync/SyncService';
 
 interface LevelDesignerProps {
@@ -33,31 +33,40 @@ interface WordSetCache {
   themes: string[];
   bank: { [theme: string]: string[] };
   versions: { [theme: string]: number };
+  challenges: Array<{
+    name: string;
+    words: string[];
+    version: number;
+    active_from?: string;
+    active_to?: string;
+  }>;
 }
 
 interface ChallengeCache {
   name: string;
   words: string[];
   version: number;
+  active_from?: string;
+  active_to?: string;
 }
 
 const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'wordsets' | 'challenges'>('wordsets');
-  const [cache, setCache] = useState<WordSetCache>({ themes: [], bank: {}, versions: {} });
-  const [challenges, setChallenges] = useState<ChallengeCache[]>([]);
+  const [activeTab, setActiveTab] = useState<'stages' | 'challenges'>('stages');
+  const [cache, setCache] = useState<WordSetCache>({ themes: [], bank: {}, versions: {}, challenges: [] });
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
+  const [selectedChallenge, setSelectedChallenge] = useState<string | null>(null);
   const [words, setWords] = useState<string[]>(Array(15).fill(''));
   const [errors, setErrors] = useState<string[]>(Array(15).fill(''));
   const [saving, setSaving] = useState(false);
   
-  // Challenge form state
-  const [challengeName, setChallengeName] = useState('');
-  const [challengeWords, setChallengeWords] = useState<string[]>(Array(15).fill(''));
-  const [challengeErrors, setChallengeErrors] = useState<string[]>(Array(15).fill(''));
+  // Editor state
+  const [currentKind, setCurrentKind] = useState<'Stage' | 'Challenge'>('Stage');
   const [activeFrom, setActiveFrom] = useState('');
   const [activeTo, setActiveTo] = useState('');
+  const [showFromDatePicker, setShowFromDatePicker] = useState(false);
+  const [showToDatePicker, setShowToDatePicker] = useState(false);
   
   const { width } = useWindowDimensions();
 
@@ -76,7 +85,7 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
   }, [isAdmin, visible]);
 
   useEffect(() => {
-    if (selectedTheme && cache.bank[selectedTheme]) {
+    if (activeTab === 'stages' && selectedTheme && cache.bank[selectedTheme]) {
       const themeWords = cache.bank[selectedTheme];
       const paddedWords = [...themeWords];
       while (paddedWords.length < 15) {
@@ -84,11 +93,40 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
       }
       setWords(paddedWords.slice(0, 15));
       setErrors(Array(15).fill(''));
-    } else if (selectedTheme === 'NEW_THEME') {
+      setCurrentKind('Stage');
+      setActiveFrom('');
+      setActiveTo('');
+    } else if (activeTab === 'challenges' && selectedChallenge) {
+      const challenge = cache.challenges.find(c => c.name === selectedChallenge);
+      if (challenge) {
+        const paddedWords = [...challenge.words];
+        while (paddedWords.length < 15) {
+          paddedWords.push('');
+        }
+        setWords(paddedWords.slice(0, 15));
+        setErrors(Array(15).fill(''));
+        setCurrentKind('Challenge');
+        setActiveFrom(challenge.active_from || '');
+        setActiveTo(challenge.active_to || '');
+      }
+    } else if (selectedTheme === 'NEW_THEME' || selectedChallenge === 'NEW_CHALLENGE') {
       setWords(Array(15).fill(''));
       setErrors(Array(15).fill(''));
+      if (selectedTheme === 'NEW_THEME') {
+        setCurrentKind('Stage');
+        setActiveFrom('');
+        setActiveTo('');
+      } else {
+        setCurrentKind('Challenge');
+        // Set default dates for new challenges
+        const today = new Date();
+        const nextWeek = new Date(today);
+        nextWeek.setDate(today.getDate() + 7);
+        setActiveFrom(today.toISOString().split('T')[0]);
+        setActiveTo(nextWeek.toISOString().split('T')[0]);
+      }
     }
-  }, [selectedTheme, cache]);
+  }, [selectedTheme, selectedChallenge, cache, activeTab]);
 
   const loadAdminStatus = async () => {
     try {
@@ -119,14 +157,11 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
       const currentCache = await getCache();
       setCache(currentCache);
       
-      if (currentCache.themes.length > 0 && !selectedTheme) {
+      if (activeTab === 'stages' && currentCache.themes.length > 0 && !selectedTheme) {
         setSelectedTheme(currentCache.themes[0]);
+      } else if (activeTab === 'challenges' && currentCache.challenges.length > 0 && !selectedChallenge) {
+        setSelectedChallenge(currentCache.challenges[0].name);
       }
-      
-      // Load challenges
-      await syncChallenges();
-      const currentChallenges = await getChallengesCache();
-      setChallenges(currentChallenges);
     } catch (error) {
       console.error('Failed to load cache:', error);
     }
@@ -169,8 +204,10 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
   };
 
   const handleSave = async () => {
-    if (!selectedTheme || selectedTheme === 'NEW_THEME') {
-      Alert.alert('Error', 'Please select or create a theme');
+    const themeName = activeTab === 'stages' ? selectedTheme : selectedChallenge;
+    
+    if (!themeName || themeName === 'NEW_THEME' || themeName === 'NEW_CHALLENGE') {
+      Alert.alert('Error', 'Please select or create a theme/challenge');
       return;
     }
 
@@ -178,13 +215,37 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
       return;
     }
 
+    // Validate challenge dates if needed
+    if (currentKind === 'Challenge') {
+      if (!activeFrom || !activeTo) {
+        Alert.alert('Error', 'Please set active dates for the challenge');
+        return;
+      }
+      
+      if (new Date(activeFrom) >= new Date(activeTo)) {
+        Alert.alert('Error', 'End date must be after start date');
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const cleanWords = words.map(word => word.trim().toLowerCase());
-      await saveTheme(selectedTheme, cleanWords);
+      await saveTheme(
+        themeName, 
+        cleanWords, 
+        currentKind,
+        currentKind === 'Challenge' ? activeFrom : undefined,
+        currentKind === 'Challenge' ? activeTo : undefined
+      );
       
       // Refresh cache
       await loadCache();
+      
+      // Trigger a refresh of the main menu challenges
+      if (typeof onClose === 'function') {
+        // The parent component should refresh its challenge state
+      }
     } catch (error) {
       console.error('Save failed:', error);
     } finally {
@@ -193,14 +254,16 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
   };
 
   const handleDelete = () => {
-    if (!selectedTheme || selectedTheme === 'NEW_THEME') {
-      Alert.alert('Error', 'Please select a theme to delete');
+    const themeName = activeTab === 'stages' ? selectedTheme : selectedChallenge;
+    
+    if (!themeName || themeName === 'NEW_THEME' || themeName === 'NEW_CHALLENGE') {
+      Alert.alert('Error', `Please select a ${currentKind.toLowerCase()} to delete`);
       return;
     }
 
     Alert.alert(
       'Confirm Delete',
-      `Are you sure you want to delete the theme "${selectedTheme}"? This cannot be undone.`,
+      `Are you sure you want to delete the ${currentKind.toLowerCase()} "${themeName}"? This cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -208,8 +271,12 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteTheme(selectedTheme);
-              setSelectedTheme(null);
+              await deleteTheme(themeName, currentKind);
+              if (activeTab === 'stages') {
+                setSelectedTheme(null);
+              } else {
+                setSelectedChallenge(null);
+              }
               await loadCache();
             } catch (error) {
               console.error('Delete failed:', error);
@@ -221,7 +288,7 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
   };
 
   const handleRevert = () => {
-    if (selectedTheme && cache.bank[selectedTheme]) {
+    if (activeTab === 'stages' && selectedTheme && cache.bank[selectedTheme]) {
       const themeWords = cache.bank[selectedTheme];
       const paddedWords = [...themeWords];
       while (paddedWords.length < 15) {
@@ -229,12 +296,24 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
       }
       setWords(paddedWords.slice(0, 15));
       setErrors(Array(15).fill(''));
+    } else if (activeTab === 'challenges' && selectedChallenge) {
+      const challenge = cache.challenges.find(c => c.name === selectedChallenge);
+      if (challenge) {
+        const paddedWords = [...challenge.words];
+        while (paddedWords.length < 15) {
+          paddedWords.push('');
+        }
+        setWords(paddedWords.slice(0, 15));
+        setErrors(Array(15).fill(''));
+        setActiveFrom(challenge.active_from || '');
+        setActiveTo(challenge.active_to || '');
+      }
     }
   };
 
   const handleNewTheme = () => {
     Alert.prompt(
-      'New Theme',
+      'New Stage Theme',
       'Enter theme name:',
       [
         { text: 'Cancel', style: 'cancel' },
@@ -244,12 +323,15 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
             if (themeName && themeName.trim()) {
               const cleanName = themeName.trim().toLowerCase();
               if (cache.themes.includes(cleanName)) {
-                Alert.alert('Error', 'Theme already exists');
+                Alert.alert('Error', 'Stage theme already exists');
                 return;
               }
               setSelectedTheme(cleanName);
+              setCurrentKind('Stage');
               setWords(Array(15).fill(''));
               setErrors(Array(15).fill(''));
+              setActiveFrom('');
+              setActiveTo('');
             }
           }
         }
@@ -259,97 +341,53 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
   };
 
   const handleNewChallenge = () => {
-    setChallengeName('');
-    setChallengeWords(Array(15).fill(''));
-    setChallengeErrors(Array(15).fill(''));
-    
-    // Set default dates (today to 7 days from now)
-    const today = new Date();
-    const nextWeek = new Date(today);
-    nextWeek.setDate(today.getDate() + 7);
-    
-    setActiveFrom(today.toISOString().split('T')[0]);
-    setActiveTo(nextWeek.toISOString().split('T')[0]);
+    Alert.prompt(
+      'New Challenge',
+      'Enter challenge name:',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Create',
+          onPress: (challengeName) => {
+            if (challengeName && challengeName.trim()) {
+              const cleanName = challengeName.trim();
+              if (cache.challenges.some(c => c.name === cleanName)) {
+                Alert.alert('Error', 'Challenge already exists');
+                return;
+              }
+              setSelectedChallenge(cleanName);
+              setCurrentKind('Challenge');
+              setWords(Array(15).fill(''));
+              setErrors(Array(15).fill(''));
+              
+              // Set default dates
+              const today = new Date();
+              const nextWeek = new Date(today);
+              nextWeek.setDate(today.getDate() + 7);
+              setActiveFrom(today.toISOString().split('T')[0]);
+              setActiveTo(nextWeek.toISOString().split('T')[0]);
+            }
+          }
+        }
+      ],
+      'plain-text'
+    );
   };
 
-  const validateChallengeWords = (): boolean => {
-    const newErrors = Array(15).fill('');
-    let isValid = true;
-    const nonEmptyWords = challengeWords.filter(word => word.trim() !== '');
-    
-    if (nonEmptyWords.length < 15) {
-      Alert.alert('Validation Error', 'Please provide at least 15 words for the challenge');
-      return false;
-    }
-
-    const seenWords = new Set<string>();
-
-    challengeWords.forEach((word, index) => {
-      const trimmed = word.trim().toLowerCase();
-      
-      if (trimmed === '') {
-        newErrors[index] = 'Required';
-        isValid = false;
-      } else if (trimmed.length < 3 || trimmed.length > 12) {
-        newErrors[index] = '3-12 chars';
-        isValid = false;
-      } else if (!/^[a-z]+$/.test(trimmed)) {
-        newErrors[index] = 'Lowercase letters only';
-        isValid = false;
-      } else if (seenWords.has(trimmed)) {
-        newErrors[index] = 'Duplicate';
-        isValid = false;
-      } else {
-        seenWords.add(trimmed);
-      }
+  const formatDate = (dateString: string): string => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric'
     });
-
-    setChallengeErrors(newErrors);
-    return isValid;
   };
 
-  const handleSaveChallenge = async () => {
-    if (!challengeName.trim()) {
-      Alert.alert('Error', 'Please enter a challenge name');
-      return;
-    }
-
-    if (!activeFrom || !activeTo) {
-      Alert.alert('Error', 'Please set active dates');
-      return;
-    }
-
-    if (new Date(activeFrom) >= new Date(activeTo)) {
-      Alert.alert('Error', 'End date must be after start date');
-      return;
-    }
-
-    if (!validateChallengeWords()) {
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const cleanWords = challengeWords
-        .filter(word => word.trim() !== '')
-        .map(word => word.trim().toLowerCase());
-      
-      await saveChallenge(challengeName.trim(), cleanWords, activeFrom, activeTo);
-      
-      // Reset form
-      setChallengeName('');
-      setChallengeWords(Array(15).fill(''));
-      setChallengeErrors(Array(15).fill(''));
-      
-      // Refresh challenges
-      await syncChallenges();
-      const updatedChallenges = await getChallengesCache();
-      setChallenges(updatedChallenges);
-    } catch (error) {
-      console.error('Save challenge failed:', error);
-    } finally {
-      setSaving(false);
-    }
+  const isDateActive = (activeFrom?: string, activeTo?: string): boolean => {
+    if (!activeFrom || !activeTo) return true; // Always active if no dates
+    const today = new Date().toISOString().split('T')[0];
+    return today >= activeFrom && today <= activeTo;
   };
 
   if (loading) {
@@ -407,16 +445,28 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
         {/* Tabs */}
         <View style={styles.tabContainer}>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'wordsets' && styles.activeTab]}
-            onPress={() => setActiveTab('wordsets')}
+            style={[styles.tab, activeTab === 'stages' && styles.activeTab]}
+            onPress={() => {
+              setActiveTab('stages');
+              setSelectedChallenge(null);
+              if (cache.themes.length > 0) {
+                setSelectedTheme(cache.themes[0]);
+              }
+            }}
           >
-            <Text style={[styles.tabText, activeTab === 'wordsets' && styles.activeTabText]}>
-              Word Sets
+            <Text style={[styles.tabText, activeTab === 'stages' && styles.activeTabText]}>
+              Stages
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'challenges' && styles.activeTab]}
-            onPress={() => setActiveTab('challenges')}
+            onPress={() => {
+              setActiveTab('challenges');
+              setSelectedTheme(null);
+              if (cache.challenges.length > 0) {
+                setSelectedChallenge(cache.challenges[0].name);
+              }
+            }}
           >
             <Text style={[styles.tabText, activeTab === 'challenges' && styles.activeTabText]}>
               Challenges
@@ -424,49 +474,121 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
           </TouchableOpacity>
         </View>
 
-        {activeTab === 'wordsets' ? (
-          <View style={[styles.content, isTablet && styles.contentTablet]}>
-          {/* Left Panel - Theme List */}
+        <View style={[styles.content, isTablet && styles.contentTablet]}>
+          {/* Left Panel - Theme/Challenge List */}
           <View style={[styles.leftPanel, isTablet && styles.leftPanelTablet]}>
             <View style={styles.panelHeader}>
-              <Text style={styles.panelTitle}>Themes</Text>
-              <TouchableOpacity style={styles.newThemeButton} onPress={handleNewTheme}>
+              <Text style={styles.panelTitle}>
+                {activeTab === 'stages' ? 'Stage Themes' : 'Challenges'}
+              </Text>
+              <TouchableOpacity 
+                style={styles.newThemeButton} 
+                onPress={activeTab === 'stages' ? handleNewTheme : handleNewChallenge}
+              >
                 <Text style={styles.newThemeButtonText}>+ New</Text>
               </TouchableOpacity>
             </View>
             
             <ScrollView style={styles.themeList}>
-              {cache.themes.map((theme) => (
-                <TouchableOpacity
-                  key={theme}
-                  style={[
-                    styles.themeItem,
-                    selectedTheme === theme && styles.themeItemSelected
-                  ]}
-                  onPress={() => setSelectedTheme(theme)}
-                >
-                  <Text style={[
-                    styles.themeItemText,
-                    selectedTheme === theme && styles.themeItemTextSelected
-                  ]}>
-                    {theme}
-                  </Text>
-                  <Text style={styles.themeVersion}>
-                    v{cache.versions[theme] || 1}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {activeTab === 'stages' ? (
+                cache.themes.map((theme) => (
+                  <TouchableOpacity
+                    key={theme}
+                    style={[
+                      styles.themeItem,
+                      selectedTheme === theme && styles.themeItemSelected
+                    ]}
+                    onPress={() => setSelectedTheme(theme)}
+                  >
+                    <Text style={[
+                      styles.themeItemText,
+                      selectedTheme === theme && styles.themeItemTextSelected
+                    ]}>
+                      {theme}
+                    </Text>
+                    <Text style={styles.themeVersion}>
+                      v{cache.versions[theme] || 1}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                cache.challenges.map((challenge) => (
+                  <TouchableOpacity
+                    key={challenge.name}
+                    style={[
+                      styles.themeItem,
+                      selectedChallenge === challenge.name && styles.themeItemSelected
+                    ]}
+                    onPress={() => setSelectedChallenge(challenge.name)}
+                  >
+                    <View style={styles.challengeItemContent}>
+                      <Text style={[
+                        styles.themeItemText,
+                        selectedChallenge === challenge.name && styles.themeItemTextSelected
+                      ]}>
+                        {challenge.name}
+                      </Text>
+                      <View style={styles.challengeItemMeta}>
+                        <Text style={styles.themeVersion}>
+                          v{challenge.version}
+                        </Text>
+                        {challenge.active_from && challenge.active_to && (
+                          <View style={styles.challengeDateBadge}>
+                            <Text style={styles.challengeDateText}>
+                              {formatDate(challenge.active_from)} – {formatDate(challenge.active_to)}
+                            </Text>
+                            {!isDateActive(challenge.active_from, challenge.active_to) && (
+                              <Text style={styles.inactiveTag}>Inactive</Text>
+                            )}
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))
+              )}
             </ScrollView>
           </View>
 
           {/* Right Panel - Editor */}
           <View style={[styles.rightPanel, isTablet && styles.rightPanelTablet]}>
-            {selectedTheme ? (
+            {(selectedTheme || selectedChallenge) ? (
               <>
                 <View style={styles.editorHeader}>
-                  <Text style={styles.editorTitle}>
-                    {selectedTheme} v{cache.versions[selectedTheme] || 1}
-                  </Text>
+                  <View style={styles.editorTitleContainer}>
+                    <Text style={styles.editorTitle}>
+                      {activeTab === 'stages' ? selectedTheme : selectedChallenge}
+                    </Text>
+                    <View style={styles.kindSelector}>
+                      <Text style={styles.kindLabel}>Kind:</Text>
+                      <View style={styles.kindBadge}>
+                        <Text style={styles.kindBadgeText}>{currentKind}</Text>
+                      </View>
+                    </View>
+                  </View>
+                  
+                  {currentKind === 'Challenge' && (
+                    <View style={styles.dateInputsContainer}>
+                      <View style={styles.dateInputGroup}>
+                        <Text style={styles.dateLabel}>Active From:</Text>
+                        <TextInput
+                          style={styles.dateInput}
+                          value={activeFrom}
+                          onChangeText={setActiveFrom}
+                          placeholder="YYYY-MM-DD"
+                        />
+                      </View>
+                      <View style={styles.dateInputGroup}>
+                        <Text style={styles.dateLabel}>Active To:</Text>
+                        <TextInput
+                          style={styles.dateInput}
+                          value={activeTo}
+                          onChangeText={setActiveTo}
+                          placeholder="YYYY-MM-DD"
+                        />
+                      </View>
+                    </View>
+                  )}
                 </View>
 
                 <ScrollView style={styles.wordsContainer}>
@@ -537,117 +659,12 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
             ) : (
               <View style={styles.noSelectionContainer}>
                 <Text style={styles.noSelectionText}>
-                  Select a theme to edit or create a new one
+                  Select a {activeTab === 'stages' ? 'stage theme' : 'challenge'} to edit or create a new one
                 </Text>
               </View>
             )}
           </View>
         </View>
-        ) : (
-          /* Challenges Tab */
-          <View style={styles.challengesContainer}>
-            <ScrollView style={styles.challengesScroll} contentContainerStyle={styles.challengesContent}>
-              <View style={styles.challengeForm}>
-                <Text style={styles.formTitle}>Create New Challenge</Text>
-                
-                <View style={styles.formRow}>
-                  <Text style={styles.formLabel}>Challenge Name</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={challengeName}
-                    onChangeText={setChallengeName}
-                    placeholder="e.g., Halloween Challenge"
-                    autoCapitalize="words"
-                  />
-                </View>
-
-                <View style={styles.formRow}>
-                  <View style={styles.dateContainer}>
-                    <View style={styles.dateField}>
-                      <Text style={styles.formLabel}>Active From</Text>
-                      <TextInput
-                        style={styles.formInput}
-                        value={activeFrom}
-                        onChangeText={setActiveFrom}
-                        placeholder="YYYY-MM-DD"
-                      />
-                    </View>
-                    <View style={styles.dateField}>
-                      <Text style={styles.formLabel}>Active To</Text>
-                      <TextInput
-                        style={styles.formInput}
-                        value={activeTo}
-                        onChangeText={setActiveTo}
-                        placeholder="YYYY-MM-DD"
-                      />
-                    </View>
-                  </View>
-                </View>
-
-                <Text style={styles.formLabel}>Words (minimum 15)</Text>
-                <View style={styles.challengeWordsGrid}>
-                  {challengeWords.map((word, index) => (
-                    <View key={index} style={styles.challengeWordContainer}>
-                      <Text style={styles.wordNumber}>{index + 1}</Text>
-                      <TextInput
-                        style={[
-                          styles.challengeWordInput,
-                          challengeErrors[index] && styles.wordInputError
-                        ]}
-                        value={word}
-                        onChangeText={(text) => {
-                          const newWords = [...challengeWords];
-                          newWords[index] = text;
-                          setChallengeWords(newWords);
-                          
-                          if (challengeErrors[index]) {
-                            const newErrors = [...challengeErrors];
-                            newErrors[index] = '';
-                            setChallengeErrors(newErrors);
-                          }
-                        }}
-                        placeholder="word"
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                      />
-                      {challengeErrors[index] ? (
-                        <Text style={styles.challengeErrorText}>{challengeErrors[index]}</Text>
-                      ) : null}
-                    </View>
-                  ))}
-                </View>
-
-                <TouchableOpacity
-                  style={[
-                    styles.saveChallengeButton,
-                    saving && styles.buttonDisabled
-                  ]}
-                  onPress={handleSaveChallenge}
-                  disabled={saving}
-                >
-                  <Text style={styles.saveChallengeButtonText}>
-                    {saving ? 'Saving Challenge...' : 'Save Challenge'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Existing Challenges */}
-              {challenges.length > 0 && (
-                <View style={styles.existingChallenges}>
-                  <Text style={styles.existingChallengesTitle}>Existing Challenges</Text>
-                  {challenges.map((challenge, index) => (
-                    <View key={index} style={styles.challengeItem}>
-                      <Text style={styles.challengeItemName}>{challenge.name}</Text>
-                      <Text style={styles.challengeItemInfo}>
-                        {challenge.words.length} words • v{challenge.version}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </ScrollView>
-          </View>
-        )}
       </View>
     </Modal>
   );
@@ -1029,6 +1046,83 @@ const styles = StyleSheet.create({
   challengeItemInfo: {
     fontSize: 14,
     color: colors.textSecondary,
+  },
+  // New styles for unified editor
+  editorTitleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  kindSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  kindLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  kindBadge: {
+    backgroundColor: colors.primary + '20',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  kindBadgeText: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  dateInputsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  dateInputGroup: {
+    flex: 1,
+  },
+  dateLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 6,
+    padding: 8,
+    fontSize: 14,
+    color: colors.text,
+    backgroundColor: colors.surface,
+  },
+  challengeItemContent: {
+    flex: 1,
+  },
+  challengeItemMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  challengeDateBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  challengeDateText: {
+    fontSize: 10,
+    color: colors.textSecondary,
+  },
+  inactiveTag: {
+    fontSize: 10,
+    color: colors.error,
+    backgroundColor: colors.error + '20',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 3,
   },
 });
 

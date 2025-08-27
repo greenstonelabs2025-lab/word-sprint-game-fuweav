@@ -11,7 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { colors } from '../styles/commonStyles';
-import { getChallengesCache, syncChallenges } from '../src/levelsync/SyncService';
+import { getCache, syncWordSets } from '../src/levelsync/SyncService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface ChallengeListProps {
@@ -24,6 +24,8 @@ interface ChallengeCache {
   name: string;
   words: string[];
   version: number;
+  active_from?: string;
+  active_to?: string;
 }
 
 interface CompletedChallenge {
@@ -43,20 +45,34 @@ export default function ChallengeList({ visible, onClose, onChallengeSelect }: C
   useEffect(() => {
     if (visible) {
       loadChallenges();
-      loadCompletedChallenges();
     }
   }, [visible]);
+
+  useEffect(() => {
+    if (challenges.length > 0) {
+      loadCompletedChallenges();
+    }
+  }, [challenges]);
 
   const loadChallenges = async () => {
     setLoading(true);
     try {
-      // Sync challenges from server first
-      await syncChallenges();
+      // Sync word sets (including challenges) from server first
+      await syncWordSets();
       
-      // Load from cache
-      const cachedChallenges = await getChallengesCache();
-      setChallenges(cachedChallenges);
-      console.log(`Loaded ${cachedChallenges.length} active challenges`);
+      // Load from unified cache
+      const cache = await getCache();
+      const activeChallenges = cache.challenges.filter(challenge => {
+        // Filter challenges that are currently active
+        if (!challenge.active_from || !challenge.active_to) {
+          return true; // Always active if no dates
+        }
+        const today = new Date().toISOString().split('T')[0];
+        return today >= challenge.active_from && today <= challenge.active_to;
+      });
+      
+      setChallenges(activeChallenges);
+      console.log(`Loaded ${activeChallenges.length} active challenges`);
     } catch (error) {
       console.error('Failed to load challenges:', error);
       Alert.alert('Error', 'Failed to load challenges. Please try again.');
@@ -67,24 +83,50 @@ export default function ChallengeList({ visible, onClose, onChallengeSelect }: C
 
   const loadCompletedChallenges = async () => {
     try {
-      const completed = await AsyncStorage.getItem(COMPLETED_CHALLENGES_KEY);
-      if (completed) {
-        setCompletedChallenges(JSON.parse(completed));
+      const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const completedToday: string[] = [];
+      
+      // Check each challenge for today's completion
+      for (const challenge of challenges) {
+        const completionKey = `challenge_done_${challenge.name}_${today}`;
+        const isCompleted = await AsyncStorage.getItem(completionKey);
+        if (isCompleted) {
+          completedToday.push(challenge.name);
+        }
       }
+      
+      // Convert to the expected format for compatibility
+      const completedData = completedToday.map(name => ({
+        name,
+        completedAt: new Date().toISOString(),
+        points: 0 // We'll get this from the completion data if needed
+      }));
+      
+      setCompletedChallenges(completedData);
     } catch (error) {
       console.error('Failed to load completed challenges:', error);
     }
   };
 
   const isChallengeCompleted = (challengeName: string): boolean => {
+    const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
     return completedChallenges.some(c => c.name === challengeName);
   };
 
   const handleChallengePress = (challenge: ChallengeCache) => {
+    // Check if challenge is currently active
+    if (challenge.active_from && challenge.active_to) {
+      const today = new Date().toISOString().split('T')[0];
+      if (today < challenge.active_from || today > challenge.active_to) {
+        Alert.alert('Challenge Not Active', 'This challenge is not currently active.');
+        return;
+      }
+    }
+    
     if (isChallengeCompleted(challenge.name)) {
       Alert.alert(
         'Challenge Completed',
-        `You have already completed "${challenge.name}". Would you like to play it again?`,
+        `You have already completed "${challenge.name}" today. Would you like to play it again?`,
         [
           { text: 'Cancel', style: 'cancel' },
           { 
@@ -101,40 +143,65 @@ export default function ChallengeList({ visible, onClose, onChallengeSelect }: C
   const renderChallenge = (challenge: ChallengeCache, index: number) => {
     const isCompleted = isChallengeCompleted(challenge.name);
     const completedData = completedChallenges.find(c => c.name === challenge.name);
+    
+    // Check if challenge is currently active
+    const isActive = !challenge.active_from || !challenge.active_to || 
+      (() => {
+        const today = new Date().toISOString().split('T')[0];
+        return today >= challenge.active_from && today <= challenge.active_to;
+      })();
+
+    const formatDate = (dateString: string) => {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
 
     return (
       <TouchableOpacity
         key={index}
         style={[
           styles.challengeCard,
-          isCompleted && styles.completedChallengeCard
+          isCompleted && styles.completedChallengeCard,
+          !isActive && styles.inactiveChallengeCard
         ]}
         onPress={() => handleChallengePress(challenge)}
+        disabled={!isActive}
       >
         <View style={styles.challengeHeader}>
           <Text style={[
             styles.challengeName,
-            isCompleted && styles.completedChallengeName
+            isCompleted && styles.completedChallengeName,
+            !isActive && styles.inactiveChallengeName
           ]}>
             {challenge.name}
           </Text>
-          {isCompleted && (
-            <Text style={styles.completedIcon}>✓</Text>
-          )}
+          <View style={styles.challengeStatus}>
+            {isCompleted && <Text style={styles.completedIcon}>✓ Complete</Text>}
+            {!isActive && <Text style={styles.inactiveTag}>Not Active</Text>}
+          </View>
         </View>
         
         <Text style={styles.challengeInfo}>
           {challenge.words.length} words
         </Text>
         
-        {isCompleted && completedData && (
-          <Text style={styles.completedInfo}>
-            Completed • {completedData.points} points
+        {challenge.active_from && challenge.active_to && (
+          <Text style={styles.challengeDates}>
+            {formatDate(challenge.active_from)} – {formatDate(challenge.active_to)}
           </Text>
         )}
         
-        <Text style={styles.challengeReward}>
-          Reward: +20 points per word
+        {isCompleted && completedData && (
+          <Text style={styles.completedInfo}>
+            Completed today
+          </Text>
+        )}
+        
+        <Text style={[
+          styles.challengeReward,
+          !isActive && styles.inactiveText
+        ]}>
+          {isActive ? 'Reward: +20 points per word' : 'Challenge not available'}
         </Text>
       </TouchableOpacity>
     );
@@ -336,5 +403,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
+  },
+  challengeStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  challengeDates: {
+    fontSize: 12,
+    color: colors.grey,
+    marginBottom: 4,
+    fontStyle: 'italic',
+  },
+  inactiveChallengeCard: {
+    backgroundColor: colors.grey + '10',
+    borderColor: colors.grey + '30',
+    opacity: 0.6,
+  },
+  inactiveChallengeName: {
+    color: colors.grey,
+  },
+  inactiveTag: {
+    fontSize: 12,
+    color: colors.error,
+    backgroundColor: colors.error + '20',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    fontWeight: '500',
+  },
+  inactiveText: {
+    color: colors.grey,
   },
 });

@@ -40,7 +40,6 @@ interface CompletionModalProps {
   onClose: () => void;
 }
 
-const COMPLETED_CHALLENGES_KEY = 'completed_challenges';
 const POINTS_PER_WORD = 20;
 
 // Scramble function
@@ -104,8 +103,10 @@ export default function ChallengeGame({ visible, challengeName, words, onExit }:
   }, [visible, words]);
 
   useEffect(() => {
-    if (words.length > 0 && currentWordIndex < words.length) {
-      const word = words[currentWordIndex];
+    if (words.length > 0) {
+      // Handle looping for challenges with fewer than 15 words
+      const wordIndex = currentWordIndex % words.length;
+      const word = words[wordIndex];
       setScrambledWord(scramble(word));
     }
   }, [currentWordIndex, words]);
@@ -116,7 +117,13 @@ export default function ChallengeGame({ visible, challengeName, words, onExit }:
     setTotalPoints(0);
     setCorrectAnswers(0);
     setShowCompletion(false);
-    console.log(`Starting challenge: ${challengeName} with ${words.length} words`);
+    
+    // Handle edge case: if challenge has fewer than 15 words, show demo message
+    if (words.length < 15) {
+      console.log(`Demo challenge: ${challengeName} with ${words.length} words (will loop)`);
+    } else {
+      console.log(`Starting challenge: ${challengeName} with ${words.length} words`);
+    }
   };
 
   const loadSettings = async () => {
@@ -184,7 +191,9 @@ export default function ChallengeGame({ visible, challengeName, words, onExit }:
   };
 
   const checkAnswer = () => {
-    const currentWord = words[currentWordIndex];
+    // Handle looping for challenges with fewer than 15 words
+    const wordIndex = currentWordIndex % words.length;
+    const currentWord = words[wordIndex];
     const isCorrect = guess.toLowerCase().trim() === currentWord.toLowerCase();
 
     if (isCorrect) {
@@ -207,7 +216,9 @@ export default function ChallengeGame({ visible, challengeName, words, onExit }:
       });
 
       // Move to next word or complete challenge
-      if (currentWordIndex + 1 >= words.length) {
+      // For challenges with fewer than 15 words, complete after 15 correct answers
+      const targetWords = Math.max(words.length, 15);
+      if (currentWordIndex + 1 >= targetWords) {
         // Challenge completed!
         completeChallenge();
       } else {
@@ -242,21 +253,14 @@ export default function ChallengeGame({ visible, challengeName, words, onExit }:
       // Award points to user
       await updatePoints(finalPoints);
 
-      // Save completion record
-      const completedChallenge = {
-        name: challengeName,
+      // Save completion record using the new format
+      const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const completionKey = `challenge_done_${challengeName}_${today}`;
+      await AsyncStorage.setItem(completionKey, JSON.stringify({
         completedAt: new Date().toISOString(),
-        points: finalPoints
-      };
-
-      const existing = await AsyncStorage.getItem(COMPLETED_CHALLENGES_KEY);
-      const completed = existing ? JSON.parse(existing) : [];
-      
-      // Remove any existing completion for this challenge
-      const filtered = completed.filter((c: any) => c.name !== challengeName);
-      filtered.push(completedChallenge);
-      
-      await AsyncStorage.setItem(COMPLETED_CHALLENGES_KEY, JSON.stringify(filtered));
+        points: finalPoints,
+        wordsCompleted: words.length
+      }));
 
       // Track analytics
       track('challenge_complete', {
@@ -311,8 +315,11 @@ export default function ChallengeGame({ visible, challengeName, words, onExit }:
     return null;
   }
 
-  const currentWord = words[currentWordIndex];
-  const progress = ((currentWordIndex + 1) / words.length) * 100;
+  const wordIndex = currentWordIndex % words.length;
+  const currentWord = words[wordIndex];
+  const targetWords = Math.max(words.length, 15);
+  const progress = ((currentWordIndex + 1) / targetWords) * 100;
+  const isDemoSet = words.length < 15;
 
   return (
     <Modal
@@ -332,9 +339,12 @@ export default function ChallengeGame({ visible, challengeName, words, onExit }:
           </TouchableOpacity>
           
           <View style={styles.headerCenter}>
-            <Text style={styles.challengeTitle}>{challengeName}</Text>
+            <Text style={styles.challengeTitle}>
+              {challengeName}
+              {isDemoSet && <Text style={styles.demoTag}> (Demo Set)</Text>}
+            </Text>
             <Text style={styles.progressText}>
-              {currentWordIndex + 1} of {words.length}
+              {currentWordIndex + 1} of {targetWords}
             </Text>
           </View>
           
@@ -408,8 +418,13 @@ export default function ChallengeGame({ visible, challengeName, words, onExit }:
               +{POINTS_PER_WORD} points per correct word
             </Text>
             <Text style={styles.infoText}>
-              {correctAnswers} correct • {words.length - correctAnswers} remaining
+              {correctAnswers} correct • {targetWords - correctAnswers} remaining
             </Text>
+            {isDemoSet && (
+              <Text style={styles.demoInfo}>
+                Demo set: Words will repeat to reach 15 total
+              </Text>
+            )}
           </View>
         </ScrollView>
 
@@ -613,5 +628,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
     textAlign: 'center',
+  },
+  demoTag: {
+    fontSize: 12,
+    color: colors.warning || '#FF9800',
+    fontWeight: 'normal',
+  },
+  demoInfo: {
+    fontSize: 12,
+    color: colors.warning || '#FF9800',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });

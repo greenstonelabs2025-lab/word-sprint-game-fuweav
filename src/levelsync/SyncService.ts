@@ -14,12 +14,22 @@ interface WordSetCache {
   themes: string[];
   bank: { [theme: string]: string[] };
   versions: { [theme: string]: number };
+  challenges: Array<{
+    name: string;
+    words: string[];
+    version: number;
+    active_from?: string;
+    active_to?: string;
+  }>;
 }
 
 interface PendingAction {
   intent: 'save' | 'delete';
   theme: string;
   words?: string[];
+  kind?: 'Stage' | 'Challenge';
+  active_from?: string;
+  active_to?: string;
   timestamp: string;
 }
 
@@ -29,6 +39,9 @@ interface WordSet {
   words: string[];
   version: number;
   updated_at: string;
+  kind: 'Stage' | 'Challenge';
+  active_from?: string;
+  active_to?: string;
 }
 
 interface Challenge {
@@ -45,6 +58,8 @@ interface ChallengeCache {
   name: string;
   words: string[];
   version: number;
+  active_from?: string;
+  active_to?: string;
 }
 
 // Initialize empty cache if none exists
@@ -55,17 +70,19 @@ export async function initializeCache(): Promise<void> {
       const emptyCache: WordSetCache = {
         themes: [],
         bank: {},
-        versions: {}
+        versions: {},
+        challenges: []
       };
       await AsyncStorage.setItem(WS_CACHE_KEY, JSON.stringify(emptyCache));
       console.log('Initialized empty word sets cache');
-    }
-    
-    // Initialize challenges cache if it doesn't exist
-    const challengesExisting = await AsyncStorage.getItem(WS_CHALLENGES_KEY);
-    if (!challengesExisting) {
-      await AsyncStorage.setItem(WS_CHALLENGES_KEY, JSON.stringify([]));
-      console.log('Initialized empty challenges cache');
+    } else {
+      // Migrate existing cache to include challenges array if missing
+      const cache = JSON.parse(existing);
+      if (!cache.challenges) {
+        cache.challenges = [];
+        await AsyncStorage.setItem(WS_CACHE_KEY, JSON.stringify(cache));
+        console.log('Migrated cache to include challenges array');
+      }
     }
   } catch (error) {
     console.error('Failed to initialize cache:', error);
@@ -77,7 +94,12 @@ export async function getCache(): Promise<WordSetCache> {
   try {
     const cached = await AsyncStorage.getItem(WS_CACHE_KEY);
     if (cached) {
-      return JSON.parse(cached);
+      const cache = JSON.parse(cached);
+      // Ensure challenges array exists for backward compatibility
+      if (!cache.challenges) {
+        cache.challenges = [];
+      }
+      return cache;
     }
   } catch (error) {
     console.error('Failed to load cache:', error);
@@ -87,7 +109,8 @@ export async function getCache(): Promise<WordSetCache> {
   return {
     themes: [],
     bank: {},
-    versions: {}
+    versions: {},
+    challenges: []
   };
 }
 
@@ -129,43 +152,60 @@ export async function syncWordSets(): Promise<void> {
     const cache = await getCache();
     let hasUpdates = false;
 
+    // Reset challenges array
+    cache.challenges = [];
+
     // Process each word set
     for (const wordSet of wordSets) {
-      const currentVersion = cache.versions[wordSet.theme] || 0;
-      
-      if (wordSet.version > currentVersion) {
-        // Update cache with newer version
-        cache.bank[wordSet.theme] = wordSet.words;
-        cache.versions[wordSet.theme] = wordSet.version;
+      if (wordSet.kind === 'Stage') {
+        // Handle Stage word sets (existing logic)
+        const currentVersion = cache.versions[wordSet.theme] || 0;
         
-        // Add to themes list if not present
-        if (!cache.themes.includes(wordSet.theme)) {
-          cache.themes.push(wordSet.theme);
+        if (wordSet.version > currentVersion) {
+          // Update cache with newer version
+          cache.bank[wordSet.theme] = wordSet.words;
+          cache.versions[wordSet.theme] = wordSet.version;
+          
+          // Add to themes list if not present
+          if (!cache.themes.includes(wordSet.theme)) {
+            cache.themes.push(wordSet.theme);
+          }
+          
+          hasUpdates = true;
+          console.log(`Updated stage ${wordSet.theme} to version ${wordSet.version}`);
         }
-        
+      } else if (wordSet.kind === 'Challenge') {
+        // Handle Challenge word sets
+        cache.challenges.push({
+          name: wordSet.theme,
+          words: wordSet.words,
+          version: wordSet.version,
+          active_from: wordSet.active_from,
+          active_to: wordSet.active_to
+        });
         hasUpdates = true;
-        console.log(`Updated ${wordSet.theme} to version ${wordSet.version}`);
+        console.log(`Added challenge ${wordSet.theme} to cache`);
       }
     }
 
-    // Remove themes that no longer exist in database
-    const dbThemes = wordSets.map(ws => ws.theme);
+    // Remove stage themes that no longer exist in database
+    const dbStageThemes = wordSets.filter(ws => ws.kind === 'Stage').map(ws => ws.theme);
     cache.themes = cache.themes.filter(theme => {
-      if (dbThemes.includes(theme)) {
+      if (dbStageThemes.includes(theme)) {
         return true;
       } else {
         // Remove from bank and versions too
         delete cache.bank[theme];
         delete cache.versions[theme];
         hasUpdates = true;
-        console.log(`Removed deleted theme: ${theme}`);
+        console.log(`Removed deleted stage theme: ${theme}`);
         return false;
       }
     });
 
     if (hasUpdates) {
       await saveCache(cache);
-      console.log('Cache updated with new word sets');
+      console.log('Cache updated with new word sets and challenges');
     }
 
     // Update last sync timestamp
@@ -177,25 +217,50 @@ export async function syncWordSets(): Promise<void> {
   }
 }
 
-// Save theme (upsert)
-export async function saveTheme(theme: string, words: string[]): Promise<void> {
-  console.log(`Saving theme: ${theme}`);
+// Save theme (upsert) - updated to support both Stage and Challenge
+export async function saveTheme(
+  theme: string, 
+  words: string[], 
+  kind: 'Stage' | 'Challenge' = 'Stage',
+  active_from?: string,
+  active_to?: string
+): Promise<void> {
+  console.log(`Saving ${kind.toLowerCase()}: ${theme}`);
   
   try {
     // Get current version for this theme
     const cache = await getCache();
-    const currentVersion = cache.versions[theme] || 0;
+    let currentVersion = 0;
+    
+    if (kind === 'Stage') {
+      currentVersion = cache.versions[theme] || 0;
+    } else {
+      // For challenges, find existing version
+      const existingChallenge = cache.challenges.find(c => c.name === theme);
+      currentVersion = existingChallenge?.version || 0;
+    }
+    
     const newVersion = currentVersion + 1;
+
+    // Prepare the payload
+    const payload: any = {
+      theme,
+      words,
+      kind,
+      version: newVersion,
+      updated_at: new Date().toISOString()
+    };
+
+    // Add date fields for challenges
+    if (kind === 'Challenge') {
+      payload.active_from = active_from;
+      payload.active_to = active_to;
+    }
 
     // Try to upsert to Supabase
     const { error } = await supabase
       .from('word_sets')
-      .upsert({
-        theme,
-        words,
-        version: newVersion,
-        updated_at: new Date().toISOString()
-      });
+      .upsert(payload);
 
     if (error) {
       console.error('Failed to save to Supabase:', error);
@@ -205,6 +270,9 @@ export async function saveTheme(theme: string, words: string[]): Promise<void> {
         intent: 'save',
         theme,
         words,
+        kind,
+        active_from,
+        active_to,
         timestamp: new Date().toISOString()
       });
       
@@ -213,34 +281,53 @@ export async function saveTheme(theme: string, words: string[]): Promise<void> {
     }
 
     // Update cache immediately on success
-    cache.bank[theme] = words;
-    cache.versions[theme] = newVersion;
-    
-    if (!cache.themes.includes(theme)) {
-      cache.themes.push(theme);
+    if (kind === 'Stage') {
+      cache.bank[theme] = words;
+      cache.versions[theme] = newVersion;
+      
+      if (!cache.themes.includes(theme)) {
+        cache.themes.push(theme);
+      }
+    } else {
+      // Update or add challenge in cache
+      const existingIndex = cache.challenges.findIndex(c => c.name === theme);
+      const challengeData = {
+        name: theme,
+        words,
+        version: newVersion,
+        active_from,
+        active_to
+      };
+      
+      if (existingIndex >= 0) {
+        cache.challenges[existingIndex] = challengeData;
+      } else {
+        cache.challenges.push(challengeData);
+      }
     }
     
     await saveCache(cache);
     
     Alert.alert('Success', `Saved ${theme} v${newVersion}`);
-    console.log(`Successfully saved ${theme} v${newVersion}`);
+    console.log(`Successfully saved ${kind.toLowerCase()} ${theme} v${newVersion}`);
 
   } catch (error) {
     console.error('Save failed:', error);
-    Alert.alert('Error', 'Failed to save theme');
+    Alert.alert('Error', `Failed to save ${kind.toLowerCase()}`);
   }
 }
 
-// Delete theme
-export async function deleteTheme(theme: string): Promise<void> {
-  console.log(`Deleting theme: ${theme}`);
+// Delete theme - updated to support both Stage and Challenge
+export async function deleteTheme(theme: string, kind: 'Stage' | 'Challenge'): Promise<void> {
+  console.log(`Deleting ${kind.toLowerCase()}: ${theme}`);
   
   try {
     // Try to delete from Supabase
     const { error } = await supabase
       .from('word_sets')
       .delete()
-      .eq('theme', theme);
+      .eq('theme', theme)
+      .eq('kind', kind);
 
     if (error) {
       console.error('Failed to delete from Supabase:', error);
@@ -249,6 +336,7 @@ export async function deleteTheme(theme: string): Promise<void> {
       await queuePendingAction({
         intent: 'delete',
         theme,
+        kind,
         timestamp: new Date().toISOString()
       });
       
@@ -258,18 +346,23 @@ export async function deleteTheme(theme: string): Promise<void> {
 
     // Update cache immediately on success
     const cache = await getCache();
-    cache.themes = cache.themes.filter(t => t !== theme);
-    delete cache.bank[theme];
-    delete cache.versions[theme];
+    
+    if (kind === 'Stage') {
+      cache.themes = cache.themes.filter(t => t !== theme);
+      delete cache.bank[theme];
+      delete cache.versions[theme];
+    } else {
+      cache.challenges = cache.challenges.filter(c => c.name !== theme);
+    }
     
     await saveCache(cache);
     
-    Alert.alert('Success', `Deleted ${theme}`);
-    console.log(`Successfully deleted ${theme}`);
+    Alert.alert('Success', `Deleted ${kind.toLowerCase()} ${theme}`);
+    console.log(`Successfully deleted ${kind.toLowerCase()} ${theme}`);
 
   } catch (error) {
     console.error('Delete failed:', error);
-    Alert.alert('Error', 'Failed to delete theme');
+    Alert.alert('Error', `Failed to delete ${kind.toLowerCase()}`);
   }
 }
 
@@ -307,31 +400,48 @@ async function flushPendingActions(): Promise<void> {
       try {
         if (action.intent === 'save' && action.words) {
           const cache = await getCache();
-          const currentVersion = cache.versions[action.theme] || 0;
+          let currentVersion = 0;
+          
+          if (action.kind === 'Stage') {
+            currentVersion = cache.versions[action.theme] || 0;
+          } else {
+            const existingChallenge = cache.challenges.find(c => c.name === action.theme);
+            currentVersion = existingChallenge?.version || 0;
+          }
+          
           const newVersion = currentVersion + 1;
+
+          const payload: any = {
+            theme: action.theme,
+            words: action.words,
+            kind: action.kind || 'Stage',
+            version: newVersion,
+            updated_at: new Date().toISOString()
+          };
+
+          if (action.kind === 'Challenge') {
+            payload.active_from = action.active_from;
+            payload.active_to = action.active_to;
+          }
 
           const { error } = await supabase
             .from('word_sets')
-            .upsert({
-              theme: action.theme,
-              words: action.words,
-              version: newVersion,
-              updated_at: new Date().toISOString()
-            });
+            .upsert(payload);
 
           if (!error) {
             successfulActions.push(i);
-            console.log(`Flushed save for ${action.theme}`);
+            console.log(`Flushed save for ${action.kind || 'Stage'} ${action.theme}`);
           }
         } else if (action.intent === 'delete') {
           const { error } = await supabase
             .from('word_sets')
             .delete()
-            .eq('theme', action.theme);
+            .eq('theme', action.theme)
+            .eq('kind', action.kind || 'Stage');
 
           if (!error) {
             successfulActions.push(i);
-            console.log(`Flushed delete for ${action.theme}`);
+            console.log(`Flushed delete for ${action.kind || 'Stage'} ${action.theme}`);
           }
         }
       } catch (error) {
@@ -367,107 +477,8 @@ export async function isCacheEmpty(): Promise<boolean> {
   return cache.themes.length === 0;
 }
 
-// Get challenges cache
+// Get challenges from unified cache
 export async function getChallengesCache(): Promise<ChallengeCache[]> {
-  try {
-    const cached = await AsyncStorage.getItem(WS_CHALLENGES_KEY);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-  } catch (error) {
-    console.error('Failed to load challenges cache:', error);
-  }
-  
-  return [];
-}
-
-// Save challenges cache
-async function saveChallengesCache(challenges: ChallengeCache[]): Promise<void> {
-  try {
-    await AsyncStorage.setItem(WS_CHALLENGES_KEY, JSON.stringify(challenges));
-    console.log('Challenges cache saved successfully');
-  } catch (error) {
-    console.error('Failed to save challenges cache:', error);
-  }
-}
-
-// Sync challenges from Supabase
-export async function syncChallenges(): Promise<void> {
-  console.log('Starting challenges sync...');
-  
-  try {
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-    console.log('Fetching challenges active on:', today);
-    
-    // Fetch active challenges from Supabase
-    // Get challenges where today is between active_from and active_to
-    const { data: challenges, error } = await supabase
-      .from('seasonal_challenges')
-      .select('*')
-      .filter('active_from', 'lte', today)
-      .filter('active_to', 'gte', today)
-      .order('updated_at', { ascending: false });
-
-    if (error) {
-      console.error('Failed to fetch challenges:', error);
-      return; // Keep cache unchanged on error
-    }
-
-    if (!challenges) {
-      console.log('No active challenges found');
-      await saveChallengesCache([]);
-      return;
-    }
-
-    // Convert to cache format
-    const challengeCache: ChallengeCache[] = challenges.map(challenge => ({
-      name: challenge.name,
-      words: challenge.words,
-      version: challenge.version
-    }));
-
-    await saveChallengesCache(challengeCache);
-    
-    // Update last sync timestamp
-    await AsyncStorage.setItem(WS_CHALLENGES_SYNC_KEY, new Date().toISOString());
-    console.log(`Synced ${challengeCache.length} active challenges`);
-
-  } catch (error) {
-    console.error('Challenges sync failed - keeping cache unchanged:', error);
-  }
-}
-
-// Save challenge (admin function)
-export async function saveChallenge(name: string, words: string[], activeFrom: string, activeTo: string): Promise<void> {
-  console.log(`Saving challenge: ${name}`);
-  
-  try {
-    // Insert new challenge to Supabase
-    const { error } = await supabase
-      .from('seasonal_challenges')
-      .insert({
-        name,
-        words,
-        active_from: activeFrom,
-        active_to: activeTo,
-        version: 1,
-        updated_at: new Date().toISOString()
-      });
-
-    if (error) {
-      console.error('Failed to save challenge to Supabase:', error);
-      Alert.alert('Error', 'Failed to save challenge');
-      return;
-    }
-
-    // Sync challenges immediately to update cache
-    await syncChallenges();
-    
-    Alert.alert('Success', `Challenge "${name}" saved successfully`);
-    console.log(`Successfully saved challenge: ${name}`);
-
-  } catch (error) {
-    console.error('Save challenge failed:', error);
-    Alert.alert('Error', 'Failed to save challenge');
-  }
+  const cache = await getCache();
+  return cache.challenges || [];
 }

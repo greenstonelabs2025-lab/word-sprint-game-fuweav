@@ -9,6 +9,7 @@ import LevelDesigner from './LevelDesigner';
 import ChallengeList from './ChallengeList';
 import { colors, commonStyles } from '../styles/commonStyles';
 import { isDailyChallengeCompleted } from '../utils/dailyChallenge';
+import { getCache } from '../src/levelsync/SyncService';
 
 interface MainMenuProps {
   onStart: () => void;
@@ -24,9 +25,11 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore, onChallen
   const [showLevelDesigner, setShowLevelDesigner] = useState(false);
   const [showChallengeList, setShowChallengeList] = useState(false);
   const [isDailyChallengeCompletedToday, setIsDailyChallengeCompletedToday] = useState(false);
+  const [hasChallenges, setHasChallenges] = useState(false);
 
   useEffect(() => {
     checkDailyChallengeStatus();
+    checkChallengesAvailable();
   }, []);
 
   const checkDailyChallengeStatus = async () => {
@@ -37,6 +40,17 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore, onChallen
     } catch (error) {
       console.error('Error checking daily challenge status:', error);
       setIsDailyChallengeCompletedToday(false);
+    }
+  };
+
+  const checkChallengesAvailable = async () => {
+    try {
+      const cache = await getCache();
+      setHasChallenges(cache.challenges && cache.challenges.length > 0);
+      console.log('Challenges available:', cache.challenges?.length || 0);
+    } catch (error) {
+      console.error('Error checking challenges:', error);
+      setHasChallenges(false);
     }
   };
 
@@ -120,11 +134,13 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore, onChallen
             textStyle={isDailyChallengeCompletedToday ? styles.completedDailyButtonText : undefined}
           />
 
-          <Button
-            text="Challenges"
-            onPress={() => setShowChallengeList(true)}
-            style={styles.challengesButton}
-          />
+          {hasChallenges && (
+            <Button
+              text="Challenges"
+              onPress={() => setShowChallengeList(true)}
+              style={styles.challengesButton}
+            />
+          )}
 
           <Button
             text="Store"
@@ -229,7 +245,11 @@ export default function MainMenu({ onStart, onDailyChallenge, onStore, onChallen
       {/* Level Designer */}
       <LevelDesigner 
         visible={showLevelDesigner} 
-        onClose={() => setShowLevelDesigner(false)} 
+        onClose={() => {
+          setShowLevelDesigner(false);
+          // Refresh challenges after designer closes
+          checkChallengesAvailable();
+        }} 
       />
 
       {/* Challenge List */}
