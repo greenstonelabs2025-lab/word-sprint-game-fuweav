@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../styles/commonStyles';
 import * as BillingService from '../billing/BillingService';
 import { updatePoints } from '../utils/pointsManager';
+import { track } from '../src/analytics/AnalyticsService';
 
 interface StoreScreenProps {
   onExit: () => void;
@@ -165,6 +166,14 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
       if (!res.success) {
         const errorMessage = mapBillingError(res.error || 'UNKNOWN_ERROR');
         
+        // Track failed purchase
+        track("iap_failed", {
+          productId: item.id,
+          error: res.error || 'UNKNOWN_ERROR',
+          price: item.price,
+          points: item.points
+        });
+        
         // Handle special case for already owned items
         if (res.error === 'ITEM_ALREADY_OWNED') {
           if (item.id === 'adfree_unlock') {
@@ -197,11 +206,27 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
         setPremiumMode(true);
       }
       
+      // Track successful purchase
+      track("iap_buy", {
+        productId: item.id,
+        price: item.price,
+        points: item.points || 0,
+        newTotalPoints: item.id.startsWith('points_') ? points + item.points : points
+      });
+      
       Alert.alert('Purchase Successful', 'Purchased');
       console.log(`Purchase completed: ${item.id}`);
       
     } catch (error) {
       console.error('Purchase error:', error);
+      
+      // Track purchase error
+      track("iap_error", {
+        productId: item.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        price: item.price
+      });
+      
       Alert.alert('Purchase Failed', 'An error occurred. Please try again.');
     } finally {
       setInFlight(false);
@@ -222,6 +247,12 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
         setPremiumMode(true);
       }
       
+      // Track restore action
+      track("iap_restore", {
+        restoredItems: ids,
+        count: ids.length
+      });
+      
       Alert.alert('Restore Complete', 'Restored');
       console.log('Purchases restored:', ids);
     } catch (error) {
@@ -234,6 +265,13 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
     try {
       await AsyncStorage.setItem('pref_ad_free', value.toString());
       setAdFreeMode(value);
+      
+      // Track preference change
+      track("pref_change", {
+        key: "ad_free",
+        value: value
+      });
+      
       console.log('Ad-free mode toggled:', value);
     } catch (error) {
       console.error('Error toggling ad-free mode:', error);

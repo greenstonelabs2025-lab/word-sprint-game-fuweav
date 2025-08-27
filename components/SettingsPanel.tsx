@@ -15,6 +15,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../styles/commonStyles';
 import { Settings, loadSettings, saveSetting, resetProgress } from '../utils/settings';
+import { track } from '../src/analytics/AnalyticsService';
 
 interface SettingsPanelProps {
   visible: boolean;
@@ -57,6 +58,13 @@ export default function SettingsPanel({ visible, onClose }: SettingsPanelProps) 
     try {
       await saveSetting(key, value);
       setSettings(prev => ({ ...prev, [key]: value }));
+      
+      // Track preference change
+      track("pref_change", {
+        key: key,
+        value: value
+      });
+      
       console.log(`Setting ${key} updated to ${value}`);
     } catch (error) {
       console.error(`Error updating setting ${key}:`, error);
@@ -67,6 +75,13 @@ export default function SettingsPanel({ visible, onClose }: SettingsPanelProps) 
     try {
       await AsyncStorage.setItem('pref_name', name);
       setDisplayName(name);
+      
+      // Track display name change (but don't include the actual name for privacy)
+      track("pref_change", {
+        key: "display_name",
+        value: name.length > 0 ? "set" : "empty"
+      });
+      
       console.log('Display name updated to:', name);
     } catch (error) {
       console.error('Error updating display name:', error);
@@ -82,6 +97,11 @@ export default function SettingsPanel({ visible, onClose }: SettingsPanelProps) 
       await resetProgress();
       setShowResetConfirm(false);
       setShowResetSuccess(true);
+      
+      // Track progress reset
+      track("progress_reset", {
+        source: "settings_panel"
+      });
       
       // Auto-hide success message and close panel
       setTimeout(() => {

@@ -7,22 +7,28 @@ import DailyChallenge from '../components/DailyChallenge';
 import StoreScreen from '../components/StoreScreen';
 import { commonStyles } from '../styles/commonStyles';
 import * as BillingService from '../billing/BillingService';
+import { initAnalytics } from '../src/analytics/AnalyticsService';
 
 export default function MainScreen() {
   const [screen, setScreen] = useState<'menu' | 'game' | 'daily' | 'store'>('menu');
 
   useEffect(() => {
-    // Initialize billing on app start
-    const initializeBilling = async () => {
+    // Initialize services on app start
+    const initializeServices = async () => {
       try {
+        // Initialize billing
         await BillingService.initBilling();
         console.log('Billing initialized on app start');
+        
+        // Initialize analytics with app version
+        await initAnalytics(undefined, '1.0.0');
+        console.log('Analytics initialized on app start');
       } catch (error) {
-        console.error('Failed to initialize billing on app start:', error);
+        console.error('Failed to initialize services on app start:', error);
       }
     };
 
-    initializeBilling();
+    initializeServices();
   }, []);
 
   console.log('Current screen:', screen);

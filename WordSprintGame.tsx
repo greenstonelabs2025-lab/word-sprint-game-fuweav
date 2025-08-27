@@ -20,6 +20,7 @@ import { themes, wordBank } from "./wordBank";
 import SettingsPanel from "./components/SettingsPanel";
 import { updatePoints } from "./components/StoreScreen";
 import { colors } from "./styles/commonStyles";
+import { track } from "./src/analytics/AnalyticsService";
 
 interface ConfirmationPopupProps {
   visible: boolean;
@@ -354,6 +355,16 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
       setPoints(np);
       setStreak(ns);
       
+      // Track correct answer
+      track("correct", {
+        stage: stage + 1,
+        level: level + 1,
+        gain,
+        streak: ns,
+        theme: themes[stage],
+        word: word.toLowerCase()
+      });
+      
       if (settings.sound) {
         playSuccess();
       }
@@ -367,6 +378,16 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
       }, 800);
     } else {
       setStreak(0);
+      
+      // Track wrong answer
+      track("wrong", {
+        stage: stage + 1,
+        level: level + 1,
+        theme: themes[stage],
+        word: word.toLowerCase(),
+        guess: input.toLowerCase()
+      });
+      
       animateWrong();
       setScrambled(scramble(word)); // Re-scramble on wrong answer
       console.log('Wrong answer - re-scrambling word');
@@ -378,6 +399,17 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     try {
       const newPoints = await updatePoints(-50);
       setPoints(newPoints);
+      
+      // Track hint purchase
+      track("hint_buy", {
+        cost: 50,
+        points: newPoints,
+        stage: stage + 1,
+        level: level + 1,
+        theme: themes[stage],
+        word: word.toLowerCase()
+      });
+      
       Alert.alert("Hint", `First letter: ${word[0]}`);
       console.log('Hint used - 50 points deducted');
     } catch (error) {
@@ -391,6 +423,17 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     try {
       const newPoints = await updatePoints(-200);
       setPoints(newPoints);
+      
+      // Track answer purchase
+      track("answer_buy", {
+        cost: 200,
+        points: newPoints,
+        stage: stage + 1,
+        level: level + 1,
+        theme: themes[stage],
+        word: word.toLowerCase()
+      });
+      
       Alert.alert("Answer", word);
       console.log('Answer revealed - 200 points deducted');
       setTimeout(() => {

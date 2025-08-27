@@ -19,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../styles/commonStyles';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../app/integrations/supabase/client';
+import { track } from '../src/analytics/AnalyticsService';
 import {
   generateDailyWord,
   getTodayKey,
@@ -434,6 +435,14 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
         setIsCompleted(true);
         setShowSuccessModal(true);
         
+        // Track daily challenge success
+        track("daily_win", {
+          day: getTodayKey(),
+          bonus: 100,
+          word: dailyWord.toLowerCase(),
+          points: newPoints
+        });
+        
         // Submit to leaderboard (non-blocking)
         submitToLeaderboard();
         
@@ -448,6 +457,14 @@ export default function DailyChallenge({ onExit }: DailyChallengeProps) {
     } else {
       // Wrong answer
       animateWrong();
+      
+      // Track wrong answer in daily challenge
+      track("daily_wrong", {
+        day: getTodayKey(),
+        word: dailyWord.toLowerCase(),
+        guess: input.toLowerCase().trim()
+      });
+      
       console.log('Wrong answer in daily challenge');
     }
   };
