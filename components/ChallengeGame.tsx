@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -97,24 +97,8 @@ export default function ChallengeGame({ visible, challengeName, words, onExit }:
   const wrongAnimation = useRef(new Animated.Value(0)).current;
   const { width } = useWindowDimensions();
 
-  useEffect(() => {
-    if (visible && words.length > 0) {
-      initializeGame();
-      loadSettings();
-      loadPremiumStatus();
-    }
-  }, [visible, words]);
-
-  useEffect(() => {
-    if (words.length > 0) {
-      // Handle looping for challenges with fewer than 15 words
-      const wordIndex = currentWordIndex % words.length;
-      const word = words[wordIndex];
-      setScrambledWord(scramble(word));
-    }
-  }, [currentWordIndex, words]);
-
-  const initializeGame = () => {
+  // Memoize initializeGame to prevent dependency warnings
+  const initializeGame = useCallback(() => {
     setCurrentWordIndex(0);
     setGuess('');
     setTotalPoints(0);
@@ -127,7 +111,24 @@ export default function ChallengeGame({ visible, challengeName, words, onExit }:
     } else {
       console.log(`Starting challenge: ${challengeName} with ${words.length} words`);
     }
-  };
+  }, [challengeName, words.length]);
+
+  useEffect(() => {
+    if (visible && words.length > 0) {
+      initializeGame();
+      loadSettings();
+      loadPremiumStatus();
+    }
+  }, [visible, words, initializeGame]);
+
+  useEffect(() => {
+    if (words.length > 0) {
+      // Handle looping for challenges with fewer than 15 words
+      const wordIndex = currentWordIndex % words.length;
+      const word = words[wordIndex];
+      setScrambledWord(scramble(word));
+    }
+  }, [currentWordIndex, words]);
 
   const loadSettings = async () => {
     try {

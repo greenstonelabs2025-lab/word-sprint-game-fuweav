@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -33,13 +33,13 @@ interface WordSetCache {
   themes: string[];
   bank: { [theme: string]: string[] };
   versions: { [theme: string]: number };
-  challenges: Array<{
+  challenges: {
     name: string;
     words: string[];
     version: number;
     active_from?: string;
     active_to?: string;
-  }>;
+  }[];
 }
 
 interface ChallengeCache {
@@ -72,6 +72,29 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
 
   const isTablet = width > 768;
 
+  // Memoize loadCache to prevent dependency warnings
+  const loadCache = useCallback(async () => {
+    console.log('LevelDesigner: Loading cache...');
+    try {
+      await initializeCache();
+      await syncWordSets();
+      const currentCache = await getCache();
+      console.log('LevelDesigner: Cache loaded:', {
+        themes: currentCache.themes.length,
+        challenges: currentCache.challenges.length
+      });
+      setCache(currentCache);
+      
+      if (activeTab === 'stages' && currentCache.themes.length > 0 && !selectedTheme) {
+        setSelectedTheme(currentCache.themes[0]);
+      } else if (activeTab === 'challenges' && currentCache.challenges.length > 0 && !selectedChallenge) {
+        setSelectedChallenge(currentCache.challenges[0].name);
+      }
+    } catch (error) {
+      console.error('LevelDesigner: Failed to load cache:', error);
+    }
+  }, [activeTab, selectedTheme, selectedChallenge]);
+
   useEffect(() => {
     console.log('LevelDesigner: visible changed to', visible);
     if (visible) {
@@ -84,7 +107,7 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
     if (isAdmin && visible) {
       loadCache();
     }
-  }, [isAdmin, visible]);
+  }, [isAdmin, visible, loadCache]);
 
   useEffect(() => {
     if (activeTab === 'stages' && selectedTheme && cache.bank[selectedTheme]) {
@@ -154,28 +177,6 @@ const LevelDesigner: React.FC<LevelDesignerProps> = ({ visible, onClose }) => {
     } catch (error) {
       console.error('LevelDesigner: Failed to enable admin:', error);
       Alert.alert('Error', 'Failed to enable admin mode');
-    }
-  };
-
-  const loadCache = async () => {
-    console.log('LevelDesigner: Loading cache...');
-    try {
-      await initializeCache();
-      await syncWordSets();
-      const currentCache = await getCache();
-      console.log('LevelDesigner: Cache loaded:', {
-        themes: currentCache.themes.length,
-        challenges: currentCache.challenges.length
-      });
-      setCache(currentCache);
-      
-      if (activeTab === 'stages' && currentCache.themes.length > 0 && !selectedTheme) {
-        setSelectedTheme(currentCache.themes[0]);
-      } else if (activeTab === 'challenges' && currentCache.challenges.length > 0 && !selectedChallenge) {
-        setSelectedChallenge(currentCache.challenges[0].name);
-      }
-    } catch (error) {
-      console.error('LevelDesigner: Failed to load cache:', error);
     }
   };
 

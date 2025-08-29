@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { 
   View, 
   Text, 
@@ -188,6 +188,68 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
   const pressScaleShuffle = useRef(new Animated.Value(1)).current;
   const fadeOpacity = useRef(new Animated.Value(1)).current;
 
+  // Memoize loadProgress to prevent dependency warnings
+  const loadProgress = useCallback(async () => {
+    try {
+      // One-time cache clear to ensure Shapes theme is used
+      const cacheCleared = await AsyncStorage.getItem('shapes_cache_cleared');
+      if (!cacheCleared) {
+        console.log('One-time cache clear: removing progress to ensure Shapes theme');
+        await AsyncStorage.removeItem('progress');
+        await AsyncStorage.setItem('shapes_cache_cleared', 'true');
+      }
+      
+      const d = await AsyncStorage.getItem("progress");
+      let stored = { stage: 0, level: 0, points: 100 };
+      
+      if (d) {
+        stored = JSON.parse(d);
+        console.log('Loaded stored progress:', stored);
+      }
+      
+      let s = stored.stage;
+      let l = stored.level;
+      let p = stored.points;
+      
+      // Guard old saves - prevent crashes if stage index is out of bounds
+      if (s >= themes.length) {
+        console.log('Stage index out of bounds, resetting to 0');
+        s = 0;
+        l = 0;
+        p = 100;
+      }
+      
+      // If saved theme name was "Test" or "Test Animals", hard reset
+      if (themes[0] !== "Shapes") {
+        console.log('First theme is not Shapes, hard reset');
+        s = 0;
+        l = 0;
+        p = 100;
+      }
+      
+      setStage(s);
+      setLevel(l);
+      setPoints(p);
+      
+      // Set word from themes after setting stage/level
+      const w = getWordForLevel(s, l);
+      setWord(w);
+      setScrambled(scramble(w));
+      
+      console.log(`Progress loaded: Stage ${s + 1}, Level ${l + 1}, Points ${p}, Word: ${w}, Theme: ${themes[s]}`);
+    } catch (e) {
+      console.log('Error loading progress:', e);
+      // Set defaults - always start with Shapes (stage 0)
+      setStage(0);
+      setLevel(0);
+      setPoints(100);
+      const w = getWordForLevel(0, 0);
+      setWord(w);
+      setScrambled(scramble(w));
+      console.log(`Default progress set: Stage 1, Level 1, Theme: ${themes[0]}, Word: ${w}`);
+    }
+  }, []);
+
   // Load settings, word sets cache, and game progress
   useEffect(() => {
     loadSettings();
@@ -199,7 +261,7 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
     if (cacheLoaded) {
       loadProgress();
     }
-  }, [cacheLoaded]);
+  }, [cacheLoaded, loadProgress]);
 
   // Initialize letter pool when word changes
   useEffect(() => {
@@ -269,67 +331,6 @@ export default function WordSprintGame({ onExit, onStore }: WordSprintGameProps)
         versions: themes.reduce((acc, theme) => ({ ...acc, [theme]: 1 }), {})
       });
       setCacheLoaded(true);
-    }
-  };
-
-  const loadProgress = async () => {
-    try {
-      // One-time cache clear to ensure Shapes theme is used
-      const cacheCleared = await AsyncStorage.getItem('shapes_cache_cleared');
-      if (!cacheCleared) {
-        console.log('One-time cache clear: removing progress to ensure Shapes theme');
-        await AsyncStorage.removeItem('progress');
-        await AsyncStorage.setItem('shapes_cache_cleared', 'true');
-      }
-      
-      const d = await AsyncStorage.getItem("progress");
-      let stored = { stage: 0, level: 0, points: 100 };
-      
-      if (d) {
-        stored = JSON.parse(d);
-        console.log('Loaded stored progress:', stored);
-      }
-      
-      let s = stored.stage;
-      let l = stored.level;
-      let p = stored.points;
-      
-      // Guard old saves - prevent crashes if stage index is out of bounds
-      if (s >= themes.length) {
-        console.log('Stage index out of bounds, resetting to 0');
-        s = 0;
-        l = 0;
-        p = 100;
-      }
-      
-      // If saved theme name was "Test" or "Test Animals", hard reset
-      if (themes[0] !== "Shapes") {
-        console.log('First theme is not Shapes, hard reset');
-        s = 0;
-        l = 0;
-        p = 100;
-      }
-      
-      setStage(s);
-      setLevel(l);
-      setPoints(p);
-      
-      // Set word from themes after setting stage/level
-      const w = getWordForLevel(s, l);
-      setWord(w);
-      setScrambled(scramble(w));
-      
-      console.log(`Progress loaded: Stage ${s + 1}, Level ${l + 1}, Points ${p}, Word: ${w}, Theme: ${themes[s]}`);
-    } catch (e) {
-      console.log('Error loading progress:', e);
-      // Set defaults - always start with Shapes (stage 0)
-      setStage(0);
-      setLevel(0);
-      setPoints(100);
-      const w = getWordForLevel(0, 0);
-      setWord(w);
-      setScrambled(scramble(w));
-      console.log(`Default progress set: Stage 1, Level 1, Theme: ${themes[0]}, Word: ${w}`);
     }
   };
 

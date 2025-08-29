@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -115,11 +115,8 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
   const [selectedItem, setSelectedItem] = useState<PurchaseItem | null>(null);
   const [inFlight, setInFlight] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  // Memoize loadData to prevent dependency warnings
+  const loadData = useCallback(async () => {
     try {
       // Load current points
       const progressData = await AsyncStorage.getItem('progress');
@@ -139,7 +136,11 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
     } catch (error) {
       console.error('Error loading store data:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const mapBillingError = (error: string): string => {
     switch (error) {

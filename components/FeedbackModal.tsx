@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -72,27 +72,8 @@ export default function FeedbackModal({
   const [displayName, setDisplayName] = useState('Player');
   const [settings, setSettings] = useState({ reduceMotion: false, highContrast: false });
 
-  useEffect(() => {
-    if (visible) {
-      loadGameData();
-      loadUserData();
-      loadUserSettings();
-      
-      // Track feedback modal open
-      track('feedback_open', { screen: 'game' });
-    }
-  }, [visible]);
-
-  useEffect(() => {
-    if (prefillCategory) {
-      setCategory(prefillCategory);
-    }
-    if (prefillMessage) {
-      setMessage(prefillMessage);
-    }
-  }, [prefillCategory, prefillMessage]);
-
-  const loadGameData = async () => {
+  // Memoize loadGameData to prevent dependency warnings
+  const loadGameData = useCallback(async () => {
     try {
       // Use provided current data if available, otherwise load from storage
       if (currentStage !== undefined && currentLevel !== undefined && currentPoints !== undefined) {
@@ -115,7 +96,27 @@ export default function FeedbackModal({
     } catch (error) {
       console.error('Error loading game data:', error);
     }
-  };
+  }, [currentStage, currentLevel, currentPoints]);
+
+  useEffect(() => {
+    if (visible) {
+      loadGameData();
+      loadUserData();
+      loadUserSettings();
+      
+      // Track feedback modal open
+      track('feedback_open', { screen: 'game' });
+    }
+  }, [visible, loadGameData]);
+
+  useEffect(() => {
+    if (prefillCategory) {
+      setCategory(prefillCategory);
+    }
+    if (prefillMessage) {
+      setMessage(prefillMessage);
+    }
+  }, [prefillCategory, prefillMessage]);
 
   const loadUserData = async () => {
     try {

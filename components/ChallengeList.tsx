@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -42,6 +42,34 @@ export default function ChallengeList({ visible, onClose, onChallengeSelect }: C
   const [loading, setLoading] = useState(false);
   const { width } = useWindowDimensions();
 
+  // Memoize loadCompletedChallenges to prevent dependency warnings
+  const loadCompletedChallenges = useCallback(async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const completedToday: string[] = [];
+      
+      // Check each challenge for today's completion
+      for (const challenge of challenges) {
+        const completionKey = `challenge_done_${challenge.name}_${today}`;
+        const isCompleted = await AsyncStorage.getItem(completionKey);
+        if (isCompleted) {
+          completedToday.push(challenge.name);
+        }
+      }
+      
+      // Convert to the expected format for compatibility
+      const completedData = completedToday.map(name => ({
+        name,
+        completedAt: new Date().toISOString(),
+        points: 0 // We'll get this from the completion data if needed
+      }));
+      
+      setCompletedChallenges(completedData);
+    } catch (error) {
+      console.error('Failed to load completed challenges:', error);
+    }
+  }, [challenges]);
+
   useEffect(() => {
     if (visible) {
       loadChallenges();
@@ -52,7 +80,7 @@ export default function ChallengeList({ visible, onClose, onChallengeSelect }: C
     if (challenges.length > 0) {
       loadCompletedChallenges();
     }
-  }, [challenges]);
+  }, [challenges, loadCompletedChallenges]);
 
   const loadChallenges = async () => {
     setLoading(true);
@@ -78,33 +106,6 @@ export default function ChallengeList({ visible, onClose, onChallengeSelect }: C
       Alert.alert('Error', 'Failed to load challenges. Please try again.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadCompletedChallenges = async () => {
-    try {
-      const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
-      const completedToday: string[] = [];
-      
-      // Check each challenge for today's completion
-      for (const challenge of challenges) {
-        const completionKey = `challenge_done_${challenge.name}_${today}`;
-        const isCompleted = await AsyncStorage.getItem(completionKey);
-        if (isCompleted) {
-          completedToday.push(challenge.name);
-        }
-      }
-      
-      // Convert to the expected format for compatibility
-      const completedData = completedToday.map(name => ({
-        name,
-        completedAt: new Date().toISOString(),
-        points: 0 // We'll get this from the completion data if needed
-      }));
-      
-      setCompletedChallenges(completedData);
-    } catch (error) {
-      console.error('Failed to load completed challenges:', error);
     }
   };
 

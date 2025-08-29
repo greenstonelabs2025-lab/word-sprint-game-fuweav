@@ -14,13 +14,13 @@ interface WordSetCache {
   themes: string[];
   bank: { [theme: string]: string[] };
   versions: { [theme: string]: number };
-  challenges: Array<{
+  challenges: {
     name: string;
     words: string[];
     version: number;
     active_from?: string;
     active_to?: string;
-  }>;
+  }[];
 }
 
 interface PendingAction {

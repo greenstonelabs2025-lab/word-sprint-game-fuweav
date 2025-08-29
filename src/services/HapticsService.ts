@@ -1,12 +1,6 @@
 
 import { Platform, Vibration } from "react-native";
-
-let expoHaptics: any = null;
-try { 
-  expoHaptics = require("expo-haptics"); 
-} catch (error) {
-  console.log("expo-haptics not available, falling back to Vibration");
-}
+import * as expoHaptics from "expo-haptics";
 
 export type Haptic = "none" | "light" | "medium" | "heavy" | "success" | "warning" | "error";
 
