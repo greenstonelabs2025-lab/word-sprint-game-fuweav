@@ -156,7 +156,7 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
     }
   };
 
-  const handlePurchase = async (item: PurchaseItem) => {
+  const handlePurchase = useCallback(async (item: PurchaseItem) => {
     if (inFlight) return;
     
     setInFlight(true);
@@ -234,7 +234,7 @@ export default function StoreScreen({ onExit }: StoreScreenProps) {
     } finally {
       setInFlight(false);
     }
-  };
+  }, [adFreeMode, points, premiumMode, inFlight]);
 
   const restorePurchases = async () => {
     try {
