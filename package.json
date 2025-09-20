@@ -5,6 +5,7 @@
   "main": "index.ts",
   "scripts": {
     "preinstall": "npx only-allow npm",
+    "postinstall": "node scripts/cleanup-package-managers.js",
     "start": "expo start -c",
     "android": "expo run:android",
     "ios": "expo run:ios",
@@ -30,6 +31,7 @@
     "verify-setup": "node scripts/verify-expo-setup.js",
     "check-metro": "node scripts/check-metro-imports.js",
     "clean-metro": "rm -rf .expo && rm -rf node_modules/.cache && rm -rf /tmp/metro-* && expo start -c",
+    "cleanup-pm": "node scripts/cleanup-package-managers.js",
     "lint": "eslint ."
   },
   "dependencies": {
