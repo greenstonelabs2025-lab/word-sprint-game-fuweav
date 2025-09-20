@@ -9,7 +9,9 @@ const FORBIDDEN_PATTERNS = [
   'metro-core/src/',
   'metro-config/src/',
   'FileStore',
-  'AssetStore'
+  'AssetStore',
+  'pnpm',
+  'yarn'
 ];
 
 const EXCLUDED_DIRS = [
@@ -76,20 +78,20 @@ function scanDirectory(dir) {
 }
 
 function main() {
-  console.log('🔍 Checking for Metro internal imports...');
+  console.log('🔍 Checking for Metro internal imports and package manager violations...');
   
   const violations = scanDirectory('.');
   
   if (violations.length === 0) {
-    console.log('✅ No Metro internal imports found!');
+    console.log('✅ No Metro internal imports or package manager violations found!');
     console.log('📋 Checked patterns:', FORBIDDEN_PATTERNS.join(', '));
     process.exit(0);
   } else {
-    console.error('❌ Found Metro internal imports:');
+    console.error('❌ Found Metro internal imports or package manager violations:');
     violations.forEach(violation => {
       console.error(`  ${violation.file}: ${violation.patterns.join(', ')}`);
     });
-    console.error('\nPlease remove these imports and use only @expo/metro-config public API.');
+    console.error('\nPlease remove these imports/references and use only @expo/metro-config public API and npm package manager.');
     process.exit(1);
   }
 }

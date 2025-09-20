@@ -27,9 +27,6 @@ function cleanNodeModules() {
     if (fs.existsSync('package-lock.json')) {
       fs.unlinkSync('package-lock.json');
     }
-    if (fs.existsSync('yarn.lock')) {
-      fs.unlinkSync('yarn.lock');
-    }
     
     success('Cleaned node_modules and lock files');
   } catch (err) {
@@ -115,12 +112,12 @@ function runExpoPrebuild() {
 }
 
 function checkMetroImports() {
-  log('Checking for Metro internal imports...');
+  log('Checking for Metro internal imports and package manager violations...');
   try {
     execSync('node scripts/check-metro-imports.js', { stdio: 'inherit' });
-    success('Metro imports check passed');
+    success('Metro imports and package manager check passed');
   } catch (err) {
-    error('Metro imports check failed - please fix Metro internal imports first');
+    error('Metro imports or package manager check failed - please fix violations first');
     process.exit(1);
   }
 }
@@ -150,7 +147,7 @@ Examples:
 
   console.log('🚀 Starting dependency fix process...');
 
-  // Always check Metro imports first
+  // Always check Metro imports and package manager violations first
   checkMetroImports();
 
   if (args.includes('--full')) {

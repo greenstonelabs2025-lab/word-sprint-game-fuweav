@@ -1,8 +1,10 @@
+
 {
   "name": "word-sprint-game-fuweav",
   "version": "1.0.0",
   "main": "index.ts",
   "scripts": {
+    "preinstall": "npx only-allow npm",
     "start": "expo start -c",
     "android": "expo run:android",
     "ios": "expo run:ios",
@@ -21,7 +23,7 @@
     "android:build": "cd android && ./gradlew :app:assembleRelease",
     "android:clean-build": "cd android && ./gradlew --stop && ./gradlew clean && ./gradlew :app:assembleRelease",
     "android:verify": "node scripts/verify-android-config.js",
-    "clean": "rm -rf node_modules package-lock.json yarn.lock && npm install",
+    "clean": "rm -rf node_modules package-lock.json && npm install",
     "prebuild:clean": "rm -rf android ios && expo prebuild --clean",
     "fix-deps": "node scripts/fix-dependencies.js",
     "fix-deps:full": "node scripts/fix-dependencies.js --full",
@@ -95,6 +97,7 @@
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-react": "^7.37.4",
     "globals": "^15.14.0",
+    "only-allow": "^1.2.1",
     "typescript": "^5.8.3",
     "webpack-cli": "^6.0.1"
   },
