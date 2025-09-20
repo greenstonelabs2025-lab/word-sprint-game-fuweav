@@ -40,6 +40,9 @@
       "expo-router",
       "./plugins/withPlayStoreConfig.js"
     ],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "scheme": "wordsprint",
     "experiments": {
       "typedRoutes": true
