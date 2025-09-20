@@ -33,12 +33,18 @@ function checkNodeVersion() {
   try {
     const output = execSync('node --version', { encoding: 'utf8' });
     const version = output.trim();
-    success(`Node.js version: ${version}`);
+    log(`Node.js version: ${version}`);
     
-    // Check if Node version is compatible (should be >= 18)
+    // Check if Node version is compatible (should be >= 18 and < 21)
     const majorVersion = parseInt(version.replace('v', '').split('.')[0]);
     if (majorVersion < 18) {
-      warning(`Node.js version ${version} might be too old. Consider upgrading to Node 18+`);
+      error(`Node.js version ${version} is too old. Please upgrade to Node 18 or 20.`);
+      return false;
+    } else if (majorVersion >= 21) {
+      error(`Node.js version ${version} is not supported. Expo tooling is not stable on Node 22+. Please use Node 18 or 20.`);
+      return false;
+    } else {
+      success(`Node.js version ${version} is compatible`);
     }
     return true;
   } catch (err) {
@@ -121,7 +127,41 @@ function checkNodeModules() {
   }
 }
 
+function checkMetroConfig() {
+  try {
+    if (fs.existsSync('metro.config.js')) {
+      const metroConfig = fs.readFileSync('metro.config.js', 'utf8');
+      
+      // Check for forbidden Metro internal imports
+      const forbiddenPatterns = ['TerminalReporter', 'metro/src/', 'metro-cache/src/', 'metro-core/src/', 'metro-config/src/'];
+      const violations = forbiddenPatterns.filter(pattern => metroConfig.includes(pattern));
+      
+      if (violations.length > 0) {
+        error(`Metro config contains forbidden internal imports: ${violations.join(', ')}`);
+        return false;
+      } else {
+        success('Metro config is clean (no internal imports)');
+      }
+    } else {
+      error('metro.config.js not found');
+      return false;
+    }
+    return true;
+  } catch (err) {
+    error(`Metro config error: ${err.message}`);
+    return false;
+  }
+}
+
 function runDiagnostics() {
+  try {
+    log('Running Metro imports check...');
+    execSync('node scripts/check-metro-imports.js', { stdio: 'inherit' });
+    success('Metro imports check passed');
+  } catch (err) {
+    error('Metro imports check failed - please fix Metro internal imports');
+  }
+  
   try {
     log('Running Expo diagnostics...');
     execSync('npx expo doctor', { stdio: 'inherit' });
@@ -141,6 +181,7 @@ function main() {
   allChecksPass &= checkPackageJson();
   allChecksPass &= checkAppJson();
   allChecksPass &= checkNodeModules();
+  allChecksPass &= checkMetroConfig();
   
   console.log('\n📋 Running additional diagnostics...');
   runDiagnostics();

@@ -27,6 +27,7 @@
     "fix-deps:full": "node scripts/fix-dependencies.js --full",
     "verify-setup": "node scripts/verify-expo-setup.js",
     "check-metro": "node scripts/check-metro-imports.js",
+    "clean-metro": "rm -rf .expo && rm -rf node_modules/.cache && rm -rf /tmp/metro-* && expo start -c",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -97,6 +98,10 @@
     "typescript": "^5.8.3",
     "webpack-cli": "^6.0.1"
   },
+  "engines": {
+    "node": ">=18 <21"
+  },
+  "packageManager": "npm@10",
   "resolutions": {
     "@expo/prebuild-config": "~10.0.2"
   },

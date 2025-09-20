@@ -50,13 +50,41 @@ function installDependencies() {
 }
 
 function clearExpoCache() {
-  log('Clearing Expo cache...');
+  log('Clearing Expo and Metro caches...');
   try {
-    execSync('npx expo start --clear', { stdio: 'pipe' });
-    success('Expo cache cleared');
+    // Clear .expo directory
+    if (fs.existsSync('.expo')) {
+      execSync('rm -rf .expo', { stdio: 'inherit' });
+      log('Cleared .expo directory');
+    }
+    
+    // Clear node_modules cache
+    if (fs.existsSync('node_modules/.cache')) {
+      execSync('rm -rf node_modules/.cache', { stdio: 'inherit' });
+      log('Cleared node_modules/.cache');
+    }
+    
+    // Clear Metro temp files
+    try {
+      execSync('rm -rf /tmp/metro-*', { stdio: 'inherit' });
+      log('Cleared Metro temp files');
+    } catch (err) {
+      // This might fail on different systems, which is fine
+      log('Metro temp files clear attempted');
+    }
+    
+    // Clear watchman cache if available
+    try {
+      execSync('watchman watch-del-all', { stdio: 'pipe' });
+      log('Cleared watchman cache');
+    } catch (err) {
+      // Watchman might not be installed, which is fine
+      log('Watchman not available (optional)');
+    }
+    
+    success('Expo and Metro caches cleared');
   } catch (err) {
-    // This might fail if expo is not running, which is fine
-    log('Expo cache clear attempted (may not have been running)');
+    error(`Failed to clear caches: ${err.message}`);
   }
 }
 
@@ -86,6 +114,17 @@ function runExpoPrebuild() {
   }
 }
 
+function checkMetroImports() {
+  log('Checking for Metro internal imports...');
+  try {
+    execSync('node scripts/check-metro-imports.js', { stdio: 'inherit' });
+    success('Metro imports check passed');
+  } catch (err) {
+    error('Metro imports check failed - please fix Metro internal imports first');
+    process.exit(1);
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
   
@@ -97,17 +136,22 @@ Options:
   --full       - Full clean (node_modules, cache, prebuild directories)
   --prebuild   - Only clean and run prebuild
   --cache      - Only clear caches
+  --metro      - Fix Metro-related issues (clean caches and check imports)
   --help, -h   - Show this help
 
 Examples:
   node scripts/fix-dependencies.js --full
   node scripts/fix-dependencies.js --prebuild
   node scripts/fix-dependencies.js --cache
+  node scripts/fix-dependencies.js --metro
 `);
     return;
   }
 
   console.log('🚀 Starting dependency fix process...');
+
+  // Always check Metro imports first
+  checkMetroImports();
 
   if (args.includes('--full')) {
     cleanNodeModules();
@@ -118,7 +162,7 @@ Examples:
   } else if (args.includes('--prebuild')) {
     cleanPrebuildDirectories();
     runExpoPrebuild();
-  } else if (args.includes('--cache')) {
+  } else if (args.includes('--cache') || args.includes('--metro')) {
     clearExpoCache();
   } else {
     // Default: clean and reinstall
@@ -129,9 +173,9 @@ Examples:
 
   success('Dependency fix process completed!');
   console.log('\n📋 Next steps:');
-  console.log('1. Try running: npm run android');
-  console.log('2. If prebuild still fails, run: node scripts/fix-dependencies.js --full');
-  console.log('3. For build issues, run: npm run build:android');
+  console.log('1. Try running: npm run start');
+  console.log('2. If Metro errors persist, run: node scripts/fix-dependencies.js --full');
+  console.log('3. For Android builds, run: npm run android');
 }
 
 if (require.main === module) {

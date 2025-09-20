@@ -3,9 +3,11 @@ const fs = require('fs');
 const path = require('path');
 
 const FORBIDDEN_PATTERNS = [
+  'TerminalReporter',
+  'metro/src/',
   'metro-cache/src/',
-  'metro-config/src/',
   'metro-core/src/',
+  'metro-config/src/',
   'FileStore',
   'AssetStore'
 ];
@@ -80,6 +82,7 @@ function main() {
   
   if (violations.length === 0) {
     console.log('✅ No Metro internal imports found!');
+    console.log('📋 Checked patterns:', FORBIDDEN_PATTERNS.join(', '));
     process.exit(0);
   } else {
     console.error('❌ Found Metro internal imports:');
