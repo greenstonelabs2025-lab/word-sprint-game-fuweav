@@ -56,6 +56,16 @@ function validateEasLogin() {
   }
 }
 
+function checkMetroImports() {
+  console.log('🔍 Checking for Metro internal imports...');
+  try {
+    execSync('node scripts/check-metro-imports.js', { stdio: 'inherit' });
+  } catch (error) {
+    console.error('❌ Metro internal imports detected. Build aborted.');
+    process.exit(1);
+  }
+}
+
 function cleanBuildCache() {
   console.log('🧹 Cleaning build cache...');
   try {
@@ -150,6 +160,7 @@ function main() {
   const shouldClean = args.includes('--clean');
 
   console.log('🔍 Validating environment...');
+  checkMetroImports();
   validateEasInstallation();
   validateEasLogin();
 

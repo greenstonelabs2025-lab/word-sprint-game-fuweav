@@ -2,42 +2,22 @@
 const { withGradleProperties, withAppBuildGradle, withProjectBuildGradle } = require('@expo/config-plugins');
 
 const withPlayStoreConfig = (config) => {
-  // Configure the top-level build.gradle for Java 17
+  // Configure the top-level build.gradle - removed problematic options.release configuration
   config = withProjectBuildGradle(config, (config) => {
     if (config.modResults.language === 'groovy') {
       let buildGradleContent = config.modResults.contents;
       
-      // Add Java 17 configuration to allprojects block
-      if (!buildGradleContent.includes('tasks.withType(JavaCompile)')) {
-        // Find allprojects block or add it
-        if (buildGradleContent.includes('allprojects {')) {
-          buildGradleContent = buildGradleContent.replace(
-            /allprojects\s*{([^}]*?)}/s,
-            (match, content) => {
-              return `allprojects {${content}
-    tasks.withType(JavaCompile).configureEach {
-        options.release = 17
-    }
-}`;
-            }
-          );
-        } else {
-          // Add allprojects block after buildscript
-          buildGradleContent = buildGradleContent.replace(
-            /buildscript\s*{[^}]*?}\s*/s,
-            (match) => {
-              return `${match}
-
-allprojects {
-    tasks.withType(JavaCompile).configureEach {
-        options.release = 17
-    }
-}
-`;
-            }
-          );
-        }
-      }
+      // Remove any existing options.release configuration that causes Metro internal import errors
+      buildGradleContent = buildGradleContent.replace(
+        /tasks\.withType\(JavaCompile\)\.configureEach\s*{\s*options\.release\s*=\s*17\s*}/g,
+        ''
+      );
+      
+      // Remove empty allprojects blocks
+      buildGradleContent = buildGradleContent.replace(
+        /allprojects\s*{\s*}/g,
+        ''
+      );
       
       config.modResults.contents = buildGradleContent;
     }
@@ -57,7 +37,7 @@ allprojects {
         );
       }
       
-      // Add Java 17 compile options
+      // Add Java 17 compile options using supported configuration
       if (!buildGradleContent.includes('sourceCompatibility JavaVersion.VERSION_17')) {
         // Find android block and add compileOptions
         buildGradleContent = buildGradleContent.replace(
@@ -69,6 +49,11 @@ allprojects {
     }
     kotlinOptions {
         jvmTarget = '17'
+    }
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(17)
+        }
     }`
         );
       }
@@ -137,7 +122,7 @@ allprojects {
     config.modResults = config.modResults || [];
     
     const properties = [
-      // Corrected JVM arguments - this is the key fix
+      // Clean JVM arguments without --release flag to prevent Metro internal import errors
       { key: 'org.gradle.jvmargs', value: '-Xmx4g -Dfile.encoding=UTF-8 -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError' },
       { key: 'org.gradle.parallel', value: 'true' },
       { key: 'org.gradle.configureondemand', value: 'true' },

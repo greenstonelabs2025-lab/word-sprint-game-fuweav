@@ -1,8 +1,10 @@
-const { getDefaultConfig } = require('expo/metro-config');
 
-const config = getDefaultConfig(__dirname);
+const { createMetroConfiguration } = require("@expo/metro-config");
 
-// Remove custom cache configuration that's causing the import error
-// Metro will use its default caching mechanism
-
-module.exports = config;
+/**
+ * Minimal, public-only Metro configuration for Expo projects.
+ * - No custom cache stores
+ * - No resolver hacks
+ * - No direct Metro internal imports
+ */
+module.exports = createMetroConfiguration(__dirname);
